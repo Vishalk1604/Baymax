@@ -475,18 +475,8 @@ See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed diagnostic proced
 ## 📸 Screenshots
 
 ### Mobile App UI
-```
-[Home Screen]          [Settings]           [Reading Dialog]
-─────────────────      ──────────────       ─────────────────
-Connected              Bluetooth Settings   Taking Readings...
-(Green indicator)      │                    ○ Loading
-                       • Scan Devices   
-Latest Readings        • ESP32_HEALTH    Please keep your
-│                      • Disconnect       finger on sensor
-♥ 72 bpm              
-💧 98%                 
-🌡️ 36.8°C
-```
+
+<img width="540" height="1200" alt="image" src="https://github.com/user-attachments/assets/feab9164-bc34-4ed6-8e6f-276da280c3c1" />
 
 ---
 
