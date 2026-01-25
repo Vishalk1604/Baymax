@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "384152045500",
+    "project_id": "baymax-2591a",
+    "storage_bucket": "baymax-2591a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384152045500:android:ef991bec4db76feee4cdb9",
+        "android_client_info": {
+          "package_name": "com.example.baymaxv1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "384152045500-973r48tok16n5gt9aiu1mfdt1ol9j4vn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLytiEN0vUGmqonzX9juzsWZV6a5WWjEE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "384152045500-973r48tok16n5gt9aiu1mfdt1ol9j4vn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
