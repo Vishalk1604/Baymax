@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import 'main_navigation.dart';
 
 class UserDetailsScreen extends StatefulWidget {
@@ -19,7 +20,16 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
   final _bloodController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
+  String _gender = 'Male';
   bool _isLoading = false;
+
+  String? _validateBloodType(String? value) {
+    if (value == null || value.isEmpty) return 'Enter blood type';
+    final cleanValue = value.trim().toUpperCase();
+    final validTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    if (!validTypes.contains(cleanValue)) return 'Invalid blood type (e.g. A+, O-)';
+    return null;
+  }
 
   Future<void> _saveDetails() async {
     if (!_formKey.currentState!.validate()) return;
@@ -33,9 +43,10 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           'name': widget.name,
           'email': widget.email,
           'age': int.parse(_ageController.text.trim()),
-          'blood': _bloodController.text.trim(),
-          'height': double.parse(_heightController.text.trim()),
-          'weight': double.parse(_weightController.text.trim()),
+          'blood': _bloodController.text.trim().toUpperCase(),
+          'height': int.parse(_heightController.text.trim()),
+          'weight': int.parse(_weightController.text.trim()),
+          'gender': _gender,
           'createdAt': FieldValue.serverTimestamp(),
         });
 
@@ -74,6 +85,29 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
               const Text('Please provide some additional details to personalize your experience.'),
               const SizedBox(height: 32),
               
+              const Text('Gender', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: const Text('Male'),
+                      value: 'Male',
+                      groupValue: _gender,
+                      onChanged: (value) => setState(() => _gender = value!),
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: const Text('Female'),
+                      value: 'Female',
+                      groupValue: _gender,
+                      onChanged: (value) => setState(() => _gender = value!),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
               TextFormField(
                 controller: _ageController,
                 decoration: InputDecoration(
@@ -82,6 +116,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                   prefixIcon: const Icon(Icons.calendar_today),
                 ),
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) => value!.isEmpty ? 'Please enter your age' : null,
               ),
               const SizedBox(height: 20),
@@ -93,7 +128,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   prefixIcon: const Icon(Icons.bloodtype),
                 ),
-                validator: (value) => value!.isEmpty ? 'Please enter your blood type' : null,
+                validator: _validateBloodType,
               ),
               const SizedBox(height: 20),
               
@@ -105,6 +140,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                   prefixIcon: const Icon(Icons.height),
                 ),
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) => value!.isEmpty ? 'Please enter your height' : null,
               ),
               const SizedBox(height: 20),
@@ -117,6 +153,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                   prefixIcon: const Icon(Icons.monitor_weight),
                 ),
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) => value!.isEmpty ? 'Please enter your weight' : null,
               ),
               const SizedBox(height: 40),

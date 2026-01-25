@@ -1,26 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+  bool _isEditing = false;
+  bool _isLoading = false;
+
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _ageController;
+  late TextEditingController _bloodController;
+  late TextEditingController _heightController;
+  late TextEditingController _weightController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _ageController = TextEditingController();
+    _bloodController = TextEditingController();
+    _heightController = TextEditingController();
+    _weightController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _ageController.dispose();
+    _bloodController.dispose();
+    _heightController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
+  String? _validateBloodType(String? value) {
+    if (value == null || value.isEmpty) return 'Enter blood type';
+    final cleanValue = value.trim().toUpperCase();
+    final validTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    if (!validTypes.contains(cleanValue)) return 'Invalid';
+    return null;
+  }
+
+  Future<void> _updateProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'name': _nameController.text.trim(),
+          'age': int.parse(_ageController.text.trim()),
+          'blood': _bloodController.text.trim().toUpperCase(),
+          'height': int.parse(_heightController.text.trim()),
+          'weight': int.parse(_weightController.text.trim()),
+        });
+        setState(() => _isEditing = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile updated successfully')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating profile: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      backgroundColor: Colors.white,
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
+        stream: _firestore.collection('users').doc(user?.uid).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -31,168 +101,309 @@ class ProfileScreen extends StatelessWidget {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
+          
+          if (!_isEditing) {
+            _nameController.text = data['name'] ?? '';
+            _ageController.text = (data['age'] ?? '').toString();
+            _bloodController.text = data['blood'] ?? '';
+            _heightController.text = (data['height'] ?? '').toString();
+            _weightController.text = (data['weight'] ?? '').toString();
+          }
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
-                // Profile Card
-                Center(
-                  child: Stack(
-                    children: [
-                      const CircleAvatar(
-                        radius: 60,
-                        backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=baymax'),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  data['name'] ?? 'User Name',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  data['email'] ?? '',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 24),
-
-                // Personal Information
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 2.5,
-                    children: [
-                      _buildInfoCard('Age', '${data['age'] ?? '--'}'),
-                      _buildInfoCard('Blood', '${data['blood'] ?? '--'}'),
-                      _buildInfoCard('Height', '${data['height'] ?? '--'} cm'),
-                      _buildInfoCard('Weight', '${data['weight'] ?? '--'} kg'),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-                // Health History
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Check-Up History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          IconButton(icon: const Icon(Icons.filter_list), onPressed: () {}),
-                        ],
-                      ),
-                      _buildHistoryItem(context, 'Oct 24, 2023', '98.6°F', '72 BPM', 'Normal'),
-                      _buildHistoryItem(context, 'Oct 10, 2023', '99.1°F', '85 BPM', 'Attention', isWarning: true),
-                      _buildHistoryItem(context, 'Sep 25, 2023', '98.4°F', '68 BPM', 'Normal'),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-                // Settings
-                ListTile(
-                  leading: const Icon(Icons.settings_outlined),
-                  title: const Text('Account Settings'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
-                ListTile(
-                  leading: const Icon(Icons.privacy_tip_outlined),
-                  title: const Text('Privacy'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text('Logout', style: TextStyle(color: Colors.red)),
-                  onTap: () async {
-                    await FirebaseAuth.instance.signOut();
-                  },
-                ),
-                const SizedBox(height: 32),
-              ],
-            ),
-          );
+          return _isEditing ? _buildEditView() : _buildProfileView(data);
         },
       ),
     );
   }
 
-  Widget _buildInfoCard(String label, String value) {
-    return Card(
-      elevation: 0,
-      color: Colors.grey[100],
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
+  Widget _buildProfileView(Map<String, dynamic> data) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Top Header Section (Dark)
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(32),
+                bottomRight: Radius.circular(32),
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(30),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.settings, color: Colors.white, size: 20),
+                        onPressed: () {},
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  data['name'] ?? 'User Name',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  data['email'] ?? '',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(150),
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
+                // Edit Profile Button
+                ElevatedButton.icon(
+                  onPressed: () => setState(() => _isEditing = true),
+                  icon: const Icon(Icons.edit, size: 18),
+                  label: const Text('Edit profile'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withAlpha(30),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      side: BorderSide(color: Colors.white.withAlpha(50)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Stats Section
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _buildStatCell('AGE', '${data['age'] ?? '--'}')),
+                    Expanded(child: _buildStatCell('BLOOD TYPE', '${data['blood']?.toString().toUpperCase() ?? '--'}')),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(child: _buildStatCell('HEIGHT', '${data['height'] ?? '--'} cm')),
+                    Expanded(child: _buildStatCell('WEIGHT', '${data['weight'] ?? '--'} kg')),
+                  ],
+                ),
+                const SizedBox(height: 40),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'RECENT HISTORY',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.0),
+                    child: Text(
+                      'No recent check-ups found',
+                      style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.red),
+                  title: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  onTap: () => FirebaseAuth.instance.signOut(),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHistoryItem(BuildContext context, String date, String temp, String heartRate, String status, {bool isWarning = false}) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        title: Text(date, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Row(
-          children: [
-            Icon(Icons.thermostat, size: 14, color: Colors.grey[600]),
-            Text(temp),
-            const SizedBox(width: 12),
-            Icon(Icons.favorite, size: 14, color: Colors.grey[600]),
-            Text(heartRate),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isWarning ? Colors.orange.withAlpha(25) : Colors.green.withAlpha(25),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                status,
-                style: TextStyle(
-                  color: isWarning ? Colors.orange : Colors.green,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+  Widget _buildEditView() {
+    return Column(
+      children: [
+        // Dark Header
+        Container(
+          width: double.infinity,
+          color: const Color(0xFF1A1A1A),
+          padding: const EdgeInsets.fromLTRB(16, 50, 16, 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(30),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.chevron_left, color: Colors.white),
+                  onPressed: () => setState(() => _isEditing = false),
                 ),
               ),
-            ),
-            const Icon(Icons.chevron_right),
-          ],
+              const Text(
+                'Edit Profile',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              _isLoading
+                  ? const SizedBox(width: 40, height: 40, child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)))
+                  : ElevatedButton(
+                      onPressed: _updateProfile,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        minimumSize: const Size(0, 36),
+                      ),
+                      child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+            ],
+          ),
         ),
+        
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'BASIC INFORMATION',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.1),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildLabel('FULL NAME'),
+                  _buildImageStyledTextField(_nameController, 'Enter your name'),
+                  const SizedBox(height: 40),
+                  const Text(
+                    'PERSONAL DETAILS',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.1),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('AGE'),
+                            _buildImageStyledTextField(_ageController, '28', keyboardType: TextInputType.number, digitsOnly: true),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('BLOOD TYPE'),
+                            _buildImageStyledTextField(_bloodController, 'A+', validator: _validateBloodType),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('HEIGHT'),
+                            _buildImageStyledTextField(_heightController, "5'10\"", keyboardType: TextInputType.number, digitsOnly: true),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('WEIGHT'),
+                            _buildImageStyledTextField(_weightController, '165 lbs', keyboardType: TextInputType.number, digitsOnly: true),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold),
       ),
+    );
+  }
+
+  Widget _buildImageStyledTextField(TextEditingController controller, String hint, {TextInputType? keyboardType, bool digitsOnly = false, String? Function(String?)? validator}) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: digitsOnly ? [FilteringTextInputFormatter.digitsOnly] : [],
+      validator: validator,
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: const Color(0xFFF5F7F9),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
+    );
+  }
+
+  Widget _buildStatCell(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+        ),
+      ],
     );
   }
 }

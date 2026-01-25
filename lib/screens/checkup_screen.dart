@@ -83,154 +83,142 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF1A1A1A),
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.chevron_left, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Health Check-Up'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            onPressed: () {},
-          ),
-        ],
+        title: const Text('Health Check-Up', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        centerTitle: true,
       ),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 12),
-                  // Device Connection Rectangle
-                  Center(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _isConnected ? Colors.teal.withAlpha(50) : Colors.red.withAlpha(50)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(5),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-                            size: 40,
-                            color: _isConnected ? Colors.teal[300] : Colors.red[300],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _isConnected ? 'Baymax Device Connected' : 'Baymax Device Not Connected',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _isConnected ? _statusMessage : 'Connect your device to start check-up',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton(
+                  // Device Connection Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFF0F0F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                          size: 48,
+                          color: _isConnected ? const Color(0xFF1A1A1A) : const Color(0xFF888888),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _isConnected ? 'Baymax Device Connected' : 'Baymax Device Not Connected',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF1A1A1A)),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _isConnected ? _statusMessage : 'Connect your device to start check-up',
+                          style: const TextStyle(color: Color(0xFF888888), fontSize: 14),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
                             onPressed: _handleConnect,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _isConnected ? Colors.grey[200] : Colors.teal,
-                              foregroundColor: _isConnected ? Colors.black87 : Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              backgroundColor: _isConnected ? const Color(0xFFF5F5F5) : const Color(0xFF1A1A1A),
+                              foregroundColor: _isConnected ? const Color(0xFF1A1A1A) : Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: Text(_isConnected ? 'Disconnect' : 'Connect Device'),
+                            child: Text(
+                              _isConnected ? 'Disconnect' : 'Connect Device',
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
+                  
+                  const Text('Measurements', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
+                  const SizedBox(height: 16),
                   
                   // Real-time Data Display (3-column row)
                   Row(
                     children: [
                       Expanded(
                         child: _buildDataCard(
-                          context,
                           'Temp',
                           _lastReading != null ? '${_lastReading!.temperature.toStringAsFixed(1)}°F' : '--',
-                          Icons.thermostat,
-                          _lastReading != null ? 'Normal' : 'Waiting',
-                          _lastReading != null ? Colors.green : Colors.grey,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: _buildDataCard(
-                          context,
-                          'Heart Rate',
+                          'HR',
                           _lastReading != null ? '${_lastReading!.heartRate} BPM' : '--',
-                          Icons.favorite,
-                          _lastReading != null ? 'Normal' : 'Waiting',
-                          _lastReading != null ? Colors.green : Colors.grey,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: _buildDataCard(
-                          context,
                           'SpO2',
                           _lastReading != null ? '${_lastReading!.spo2}%' : '--',
-                          Icons.water_drop,
-                          _lastReading != null ? 'Normal' : 'Waiting',
-                          _lastReading != null ? Colors.green : Colors.grey,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  // Take Readings button
+                  
+                  const SizedBox(height: 32),
+                  // Take Readings button - Modern Style
                   if (!_isMeasuring)
-                    Center(
-                      child: TextButton.icon(
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
                         onPressed: _startMeasurement,
-                        icon: Icon(_hasTakenReading ? Icons.refresh : Icons.play_arrow, size: 18),
+                        icon: Icon(_hasTakenReading ? Icons.refresh : Icons.play_arrow, size: 20),
                         label: Text(_hasTakenReading ? 'Retake Readings' : 'Take Readings'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.teal,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF1A1A1A),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: const BorderSide(color: Color(0xFFF0F0F0)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                       ),
                     ),
-                  const SizedBox(height: 20),
-                  // "How are you feeling" text box
-                  const Text(
-                    'How are you feeling?',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
+                    
+                  const SizedBox(height: 32),
+                  const Text('Observations', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
+                  const SizedBox(height: 12),
                   TextField(
                     maxLines: 4,
                     decoration: InputDecoration(
-                      hintText: 'Type your symptoms or mood here...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[200]!),
-                      ),
+                      hintText: 'Describe how you feel...',
+                      hintStyle: const TextStyle(color: Color(0xFF888888)),
                       filled: true,
                       fillColor: Colors.white,
-                      alignLabelWithHint: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: Color(0xFFF0F0F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: Color(0xFFF0F0F0)),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -238,16 +226,10 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
           
           // Action Buttons - Sticky at bottom
           Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            decoration: const BoxDecoration(
               color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
-                ),
-              ],
+              border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -255,61 +237,31 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                 if (!_isMeasuring) ...[
                   SizedBox(
                     width: double.infinity,
-                    height: 52,
+                    height: 56,
                     child: ElevatedButton(
                       onPressed: _hasTakenReading ? () {} : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        backgroundColor: const Color(0xFF1A1A1A),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        disabledBackgroundColor: const Color(0xFFF5F5F5),
+                        disabledForegroundColor: const Color(0xFF888888),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       child: const Text('Evaluate Health', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _hasTakenReading ? () {} : null,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('Save Results'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _hasTakenReading ? () {} : null,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('Share'),
-                        ),
-                      ),
-                    ],
-                  ),
                 ] else ...[
-                  const LinearProgressIndicator(),
-                  const SizedBox(height: 16),
+                  const LinearProgressIndicator(color: Color(0xFF1A1A1A), backgroundColor: Color(0xFFF5F5F5)),
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
-                    height: 52,
+                    height: 56,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // For simplicity, we just stop the UI state if needed, 
-                        // though the device might continue until it finishes or is disconnected.
-                        setState(() {
-                          _isMeasuring = false;
-                        });
-                      },
+                      onPressed: () => setState(() => _isMeasuring = false),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[400],
+                        backgroundColor: const Color(0xFFDC2626),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       child: const Text('Stop Check-Up', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
@@ -323,41 +275,27 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
     );
   }
 
-  Widget _buildDataCard(BuildContext context, String title, String value, IconData icon, String status, Color statusColor) {
+  Widget _buildDataCard(String label, String value) {
     return Container(
-      padding: const EdgeInsets.all(10.0),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF0F0F0)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 4),
-              Text(title, style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w500)),
-            ],
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF888888), fontWeight: FontWeight.w600, letterSpacing: 1.1),
           ),
           const SizedBox(height: 8),
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 4),
-              Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
-            ],
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A)),
+            ),
           ),
         ],
       ),

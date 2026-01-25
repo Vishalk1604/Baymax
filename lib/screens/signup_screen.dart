@@ -17,20 +17,27 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Enter a password';
+    if (value.length < 7) return 'Minimum 7 characters required';
+    if (!value.contains(RegExp(r'[A-Z]'))) return 'Must contain at least one uppercase letter';
+    if (!value.contains(RegExp(r'[0-9]'))) return 'Must contain at least one number';
+    if (!value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) return 'Must contain at least one special character';
+    return null;
+  }
+
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // Create user in Firebase Auth
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
       if (mounted) {
-        // Navigate to UserDetailsScreen to complete the profile
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -112,8 +119,10 @@ class _SignupScreenState extends State<SignupScreen> {
                       onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                     ),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    helperText: 'Min 7 chars, 1 Uppercase, 1 Number, 1 Special Char',
+                    helperMaxLines: 2,
                   ),
-                  validator: (value) => value!.length < 6 ? 'Password too short' : null,
+                  validator: _validatePassword,
                 ),
                 const SizedBox(height: 40),
                 _isLoading

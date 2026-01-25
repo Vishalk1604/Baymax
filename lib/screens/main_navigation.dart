@@ -18,14 +18,13 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const AppointmentsListScreen(),
-    const SizedBox.shrink(), // Placeholder for the center button
+    const SizedBox.shrink(),
     const MedicationsScreen(),
     const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
     if (index == 2) {
-      // Push the CheckUpScreen as a new page so the back button works correctly
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const CheckUpScreen()),
@@ -44,41 +43,51 @@ class _MainNavigationState extends State<MainNavigation> {
         index: _selectedIndex,
         children: _screens,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Appointments',
-          ),
-          BottomNavigationBarItem(
-            icon: CircleAvatar(
-              backgroundColor: Colors.teal,
-              child: Icon(Icons.add, color: Colors.white),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: const Color(0xFF1A1A1A),
+          unselectedItemColor: const Color(0xFF888888),
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined, size: 24),
+              activeIcon: Icon(Icons.home, size: 24),
+              label: 'Home',
             ),
-            label: 'Checkup',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.medication_outlined),
-            activeIcon: Icon(Icons.medication),
-            label: 'Meds',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today_outlined, size: 24),
+              activeIcon: Icon(Icons.calendar_today, size: 24),
+              label: 'Schedule',
+            ),
+            BottomNavigationBarItem(
+              icon: CircleAvatar(
+                radius: 18,
+                backgroundColor: Color(0xFF1A1A1A),
+                child: Icon(Icons.add, color: Colors.white, size: 20),
+              ),
+              label: 'Checkup',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.medication_outlined, size: 24),
+              activeIcon: Icon(Icons.medication, size: 24),
+              label: 'Meds',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline, size: 24),
+              activeIcon: Icon(Icons.person, size: 24),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }

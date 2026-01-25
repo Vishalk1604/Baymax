@@ -43,73 +43,50 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            child: const Icon(Icons.health_and_safety, color: Colors.teal),
-          ),
-        ),
-        title: const Text('Baymax'),
+        backgroundColor: const Color(0xFF1A1A1A),
+        elevation: 0,
+        title: const Text('Baymax', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_outlined),
+            icon: const Icon(Icons.notifications_none_outlined, color: Colors.white),
             onPressed: () {},
           ),
-          const Padding(
-            padding: EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=baymax'),
-            ),
-          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Device Connection Card
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.withAlpha(30)),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFF0F0F0)),
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: _isConnected ? Colors.teal.withAlpha(20) : Colors.grey.withAlpha(20),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-                        color: _isConnected ? Colors.teal : Colors.grey,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'Baymax Device',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1A1A1A)),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           _isConnected ? 'Connected' : 'Disconnected',
                           style: TextStyle(
-                            color: _isConnected ? Colors.teal : Colors.red,
-                            fontSize: 12,
+                            color: _isConnected ? Colors.green : const Color(0xFF888888),
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -119,138 +96,70 @@ class _HomeScreenState extends State<HomeScreen> {
                     ElevatedButton(
                       onPressed: _handleConnect,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isConnected ? Colors.grey[200] : Colors.teal,
-                        foregroundColor: _isConnected ? Colors.black87 : Colors.white,
+                        backgroundColor: _isConnected ? const Color(0xFFF5F5F5) : const Color(0xFF1A1A1A),
+                        foregroundColor: _isConnected ? const Color(0xFF1A1A1A) : Colors.white,
                         elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: Text(
                         _isConnected ? 'Disconnect' : 'Connect',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              
-              // Quick Actions Bar
-              Card(
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE0F2F1),
-                    child: Icon(Icons.calendar_today_outlined, color: Colors.teal),
-                  ),
-                  title: const Text('Book Appointment', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Schedule a visit with a specialist'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AppointmentBookingScreen()),
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE0F2F1),
-                    child: Icon(Icons.medical_services_outlined, color: Colors.teal),
-                  ),
-                  title: const Text('Health Check-Up', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Start a new health screening'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CheckUpScreen()),
-                    );
-                  },
-                ),
-              ),
-
               const SizedBox(height: 24),
-              const Text('Overview', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              
+              const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
+              const SizedBox(height: 16),
+
+              _buildActionCard(
+                'Book Appointment',
+                'Schedule a visit with a specialist',
+                () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const AppointmentBookingScreen()));
+                },
+              ),
               const SizedBox(height: 12),
+              _buildActionCard(
+                'Health Check-Up',
+                'Start a new health screening',
+                () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CheckUpScreen()));
+                },
+              ),
+
+              const SizedBox(height: 32),
+              const Text('Overview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
+              const SizedBox(height: 16),
 
               // Last Check-up Summary
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(20.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Last Check-up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text('Oct 24, 2023', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                          const Text('Last Check-up', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1A1A1A))),
+                          const Text('Oct 24, 2023', style: TextStyle(color: Color(0xFF888888), fontSize: 13)),
                         ],
                       ),
-                      const Divider(height: 24),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Divider(color: Color(0xFFF0F0F0), height: 1),
+                      ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatItem(context, Icons.thermostat, '98.6°F', 'Temp'),
-                          _buildStatItem(context, Icons.favorite, '72 BPM', 'Heart Rate'),
-                          _buildStatItem(context, Icons.speed, '120/80', 'BP'),
+                          _buildStatItem('98.6°F', 'Temp'),
+                          _buildStatItem('72 BPM', 'Heart Rate'),
+                          _buildStatItem('120/80', 'BP'),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {},
-                          child: const Text('View Details'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Today's Medications
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("Today's Medications", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withAlpha(25),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text('2 Pending', style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      const Row(
-                        children: [
-                          Icon(Icons.access_time, size: 16, color: Colors.grey),
-                          SizedBox(width: 8),
-                          Text('Next: 2:00 PM - Aspirin', style: TextStyle(fontSize: 14)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {},
-                          child: const Text('View All'),
-                        ),
                       ),
                     ],
                   ),
@@ -264,13 +173,42 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatItem(BuildContext context, IconData icon, String value, String label) {
+  Widget _buildActionCard(String title, String subtitle, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFF0F0F0)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1A1A1A))),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: const TextStyle(color: Color(0xFF888888), fontSize: 13, fontWeight: FontWeight.w400)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Color(0xFF1A1A1A), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String value, String label) {
     return Column(
       children: [
-        Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF1A1A1A))),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        Text(label, style: const TextStyle(color: Color(0xFF888888), fontSize: 12, fontWeight: FontWeight.w500)),
       ],
     );
   }
