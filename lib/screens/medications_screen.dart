@@ -68,7 +68,7 @@ class MedicationsScreen extends StatelessWidget {
                         subtitle: Text(durationDays == 0 ? 'Permanent' : '$daysRemaining days remaining of $durationDays days'),
                       ),
                     );
-                  }).toList(),
+                  }),
                   const SizedBox(height: 24),
                 ],
 

@@ -82,8 +82,11 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
@@ -107,21 +110,26 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.cardTheme.color,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFF0F0F0)),
+                      border: Border.all(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
                     ),
                     child: Column(
                       children: [
                         Icon(
                           _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
                           size: 48,
-                          color: _isConnected ? const Color(0xFF1A1A1A) : const Color(0xFF888888),
+                          color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                         ),
                         const SizedBox(height: 16),
                         Text(
                           _isConnected ? 'Baymax Device Connected' : 'Baymax Device Not Connected',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF1A1A1A)),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700, 
+                            fontSize: 18, 
+                            color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -134,8 +142,12 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                           child: ElevatedButton(
                             onPressed: _handleConnect,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _isConnected ? const Color(0xFFF5F5F5) : const Color(0xFF1A1A1A),
-                              foregroundColor: _isConnected ? const Color(0xFF1A1A1A) : Colors.white,
+                              backgroundColor: _isConnected 
+                                  ? (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5)) 
+                                  : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
+                              foregroundColor: _isConnected 
+                                  ? (isDark ? Colors.white : const Color(0xFF1A1A1A)) 
+                                  : (isDark ? Colors.black : Colors.white),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
@@ -150,7 +162,14 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                   ),
                   const SizedBox(height: 32),
                   
-                  const Text('Measurements', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
+                  Text(
+                    'Measurements', 
+                    style: TextStyle(
+                      fontSize: 16, 
+                      fontWeight: FontWeight.w700, 
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+                    )
+                  ),
                   const SizedBox(height: 16),
                   
                   // Real-time Data Display (3-column row)
@@ -160,6 +179,8 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                         child: _buildDataCard(
                           'Temp',
                           _lastReading != null ? '${_lastReading!.temperature.toStringAsFixed(1)}°F' : '--',
+                          isDark,
+                          theme
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -167,6 +188,8 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                         child: _buildDataCard(
                           'HR',
                           _lastReading != null ? '${_lastReading!.heartRate} BPM' : '--',
+                          isDark,
+                          theme
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -174,6 +197,8 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                         child: _buildDataCard(
                           'SpO2',
                           _lastReading != null ? '${_lastReading!.spo2}%' : '--',
+                          isDark,
+                          theme
                         ),
                       ),
                     ],
@@ -189,32 +214,44 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                         icon: Icon(_hasTakenReading ? Icons.refresh : Icons.play_arrow, size: 20),
                         label: Text(_hasTakenReading ? 'Retake Readings' : 'Take Readings'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF1A1A1A),
+                          backgroundColor: isDark ? const Color(0xFF1C1C1C) : Colors.white,
+                          foregroundColor: isDark ? Colors.white : const Color(0xFF1A1A1A),
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: const BorderSide(color: Color(0xFFF0F0F0)),
+                          side: BorderSide(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                       ),
                     ),
                     
                   const SizedBox(height: 32),
-                  const Text('Observations', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
+                  Text(
+                    'Observations', 
+                    style: TextStyle(
+                      fontSize: 16, 
+                      fontWeight: FontWeight.w700, 
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+                    )
+                  ),
                   const SizedBox(height: 12),
                   TextField(
                     maxLines: 4,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     decoration: InputDecoration(
                       hintText: 'Describe how you feel...',
                       hintStyle: const TextStyle(color: Color(0xFF888888)),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: isDark ? const Color(0xFF1C1C1C) : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: Color(0xFFF0F0F0)),
+                        borderSide: BorderSide(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: Color(0xFFF0F0F0)),
+                        borderSide: BorderSide(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
                       ),
                     ),
                   ),
@@ -227,9 +264,9 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
           // Action Buttons - Sticky at bottom
           Container(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
+            decoration: BoxDecoration(
+              color: theme.cardTheme.color,
+              border: Border(top: BorderSide(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0))),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -241,9 +278,9 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                     child: ElevatedButton(
                       onPressed: _hasTakenReading ? () {} : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A1A1A),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: const Color(0xFFF5F5F5),
+                        backgroundColor: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                        foregroundColor: isDark ? Colors.black : Colors.white,
+                        disabledBackgroundColor: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5),
                         disabledForegroundColor: const Color(0xFF888888),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
@@ -251,7 +288,10 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
                     ),
                   ),
                 ] else ...[
-                  const LinearProgressIndicator(color: Color(0xFF1A1A1A), backgroundColor: Color(0xFFF5F5F5)),
+                  LinearProgressIndicator(
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A), 
+                    backgroundColor: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5)
+                  ),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -275,13 +315,13 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
     );
   }
 
-  Widget _buildDataCard(String label, String value) {
+  Widget _buildDataCard(String label, String value, bool isDark, ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF0F0F0)),
+        border: Border.all(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
       ),
       child: Column(
         children: [
@@ -294,7 +334,11 @@ class _CheckUpScreenState extends State<CheckUpScreen> {
             fit: BoxFit.scaleDown,
             child: Text(
               value,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A)),
+              style: TextStyle(
+                fontSize: 20, 
+                fontWeight: FontWeight.w700, 
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+              ),
             ),
           ),
         ],

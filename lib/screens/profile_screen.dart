@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -86,9 +87,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = _auth.currentUser;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: StreamBuilder<DocumentSnapshot>(
         stream: _firestore.collection('users').doc(user?.uid).snapshots(),
         builder: (context, snapshot) {
@@ -110,13 +113,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _weightController.text = (data['weight'] ?? '').toString();
           }
 
-          return _isEditing ? _buildEditView() : _buildProfileView(data);
+          return _isEditing ? _buildEditView(theme, isDark) : _buildProfileView(data, theme, isDark);
         },
       ),
     );
   }
 
-  Widget _buildProfileView(Map<String, dynamic> data) {
+  Widget _buildProfileView(Map<String, dynamic> data, ThemeData theme, bool isDark) {
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -143,7 +146,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.settings, color: Colors.white, size: 20),
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -194,26 +202,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Row(
                   children: [
-                    Expanded(child: _buildStatCell('AGE', '${data['age'] ?? '--'}')),
-                    Expanded(child: _buildStatCell('BLOOD TYPE', '${data['blood']?.toString().toUpperCase() ?? '--'}')),
+                    Expanded(child: _buildStatCell('AGE', '${data['age'] ?? '--'}', isDark)),
+                    Expanded(child: _buildStatCell('BLOOD TYPE', data['blood']?.toString().toUpperCase() ?? '--', isDark)),
                   ],
                 ),
                 const SizedBox(height: 32),
                 Row(
                   children: [
-                    Expanded(child: _buildStatCell('HEIGHT', '${data['height'] ?? '--'} cm')),
-                    Expanded(child: _buildStatCell('WEIGHT', '${data['weight'] ?? '--'} kg')),
+                    Expanded(child: _buildStatCell('HEIGHT', '${data['height'] ?? '--'} cm', isDark)),
+                    Expanded(child: _buildStatCell('WEIGHT', '${data['weight'] ?? '--'} kg', isDark)),
                   ],
                 ),
                 const SizedBox(height: 40),
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'RECENT HISTORY',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey,
+                      color: isDark ? Colors.grey[400] : Colors.grey,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -243,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildEditView() {
+  Widget _buildEditView(ThemeData theme, bool isDark) {
     return Column(
       children: [
         // Dark Header
@@ -293,17 +301,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'BASIC INFORMATION',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.1),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.grey[400] : Colors.grey, letterSpacing: 1.1),
                   ),
                   const SizedBox(height: 20),
-                  _buildLabel('FULL NAME'),
-                  _buildImageStyledTextField(_nameController, 'Enter your name'),
+                  _buildLabel('FULL NAME', isDark),
+                  _buildImageStyledTextField(_nameController, 'Enter your name', isDark),
                   const SizedBox(height: 40),
-                  const Text(
+                  Text(
                     'PERSONAL DETAILS',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.1),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.grey[400] : Colors.grey, letterSpacing: 1.1),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -312,8 +320,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('AGE'),
-                            _buildImageStyledTextField(_ageController, '28', keyboardType: TextInputType.number, digitsOnly: true),
+                            _buildLabel('AGE', isDark),
+                            _buildImageStyledTextField(_ageController, '28', isDark, keyboardType: TextInputType.number, digitsOnly: true),
                           ],
                         ),
                       ),
@@ -322,8 +330,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('BLOOD TYPE'),
-                            _buildImageStyledTextField(_bloodController, 'A+', validator: _validateBloodType),
+                            _buildLabel('BLOOD TYPE', isDark),
+                            _buildImageStyledTextField(_bloodController, 'A+', isDark, validator: _validateBloodType),
                           ],
                         ),
                       ),
@@ -336,8 +344,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('HEIGHT'),
-                            _buildImageStyledTextField(_heightController, "5'10\"", keyboardType: TextInputType.number, digitsOnly: true),
+                            _buildLabel('HEIGHT', isDark),
+                            _buildImageStyledTextField(_heightController, "5'10\"", isDark, keyboardType: TextInputType.number, digitsOnly: true),
                           ],
                         ),
                       ),
@@ -346,8 +354,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('WEIGHT'),
-                            _buildImageStyledTextField(_weightController, '165 lbs', keyboardType: TextInputType.number, digitsOnly: true),
+                            _buildLabel('WEIGHT', isDark),
+                            _buildImageStyledTextField(_weightController, '165 lbs', isDark, keyboardType: TextInputType.number, digitsOnly: true),
                           ],
                         ),
                       ),
@@ -362,46 +370,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLabel(String text) {
+  Widget _buildLabel(String text, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold),
+        style: TextStyle(fontSize: 11, color: isDark ? Colors.grey[400] : Colors.grey, fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  Widget _buildImageStyledTextField(TextEditingController controller, String hint, {TextInputType? keyboardType, bool digitsOnly = false, String? Function(String?)? validator}) {
+  Widget _buildImageStyledTextField(TextEditingController controller, String hint, bool isDark, {TextInputType? keyboardType, bool digitsOnly = false, String? Function(String?)? validator}) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: digitsOnly ? [FilteringTextInputFormatter.digitsOnly] : [],
       validator: validator,
+      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
       decoration: InputDecoration(
         hintText: hint,
+        hintStyle: TextStyle(color: isDark ? Colors.grey[600] : Colors.grey[400]),
         filled: true,
-        fillColor: const Color(0xFFF5F7F9),
+        fillColor: isDark ? const Color(0xFF1C1C1C) : const Color(0xFFF5F7F9),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderSide: isDark ? const BorderSide(color: Color(0xFF2C2C2C)) : BorderSide.none,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
 
-  Widget _buildStatCell(String label, String value) {
+  Widget _buildStatCell(String label, String value, bool isDark) {
     return Column(
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.1),
         ),
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
         ),
       ],
     );

@@ -151,7 +151,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                         controller: _dosageController,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
-                          hintText: '500',
+                          hintText: '10',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
@@ -166,7 +166,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                       const Text('Form', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        value: 'Tablet',
+                        initialValue: 'Tablet',
                         items: ['Tablet', 'Capsule', 'Syrup', 'Injection'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                         onChanged: (val) {},
                         decoration: InputDecoration(

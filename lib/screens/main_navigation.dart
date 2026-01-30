@@ -38,32 +38,36 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
         children: _screens,
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
+        decoration: BoxDecoration(
+          color: theme.cardTheme.color,
+          border: Border(top: BorderSide(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0))),
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: const Color(0xFF1A1A1A),
+          backgroundColor: theme.cardTheme.color,
+          selectedItemColor: isDark ? Colors.white : const Color(0xFF1A1A1A),
           unselectedItemColor: const Color(0xFF888888),
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
           elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined, size: 24),
               activeIcon: Icon(Icons.home, size: 24),
               label: 'Home',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today_outlined, size: 24),
               activeIcon: Icon(Icons.calendar_today, size: 24),
               label: 'Schedule',
@@ -71,17 +75,17 @@ class _MainNavigationState extends State<MainNavigation> {
             BottomNavigationBarItem(
               icon: CircleAvatar(
                 radius: 18,
-                backgroundColor: Color(0xFF1A1A1A),
-                child: Icon(Icons.add, color: Colors.white, size: 20),
+                backgroundColor: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                child: Icon(Icons.add, color: isDark ? Colors.black : Colors.white, size: 20),
               ),
               label: 'Checkup',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.medication_outlined, size: 24),
               activeIcon: Icon(Icons.medication, size: 24),
               label: 'Meds',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline, size: 24),
               activeIcon: Icon(Icons.person, size: 24),
               label: 'Profile',

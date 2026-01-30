@@ -42,8 +42,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
@@ -68,18 +71,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.cardTheme.color,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFF0F0F0)),
+                  border: Border.all(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
                 ),
                 child: Row(
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Baymax Device',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1A1A1A)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700, 
+                            fontSize: 16, 
+                            color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -96,8 +103,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ElevatedButton(
                       onPressed: _handleConnect,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isConnected ? const Color(0xFFF5F5F5) : const Color(0xFF1A1A1A),
-                        foregroundColor: _isConnected ? const Color(0xFF1A1A1A) : Colors.white,
+                        backgroundColor: _isConnected 
+                            ? (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5))
+                            : (isDark ? Colors.white : const Color(0xFF1A1A1A)),
+                        foregroundColor: _isConnected 
+                            ? (isDark ? Colors.white : const Color(0xFF1A1A1A))
+                            : (isDark ? Colors.black : Colors.white),
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -112,12 +123,20 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
               
-              const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
+              Text(
+                'Quick Actions', 
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.w700, 
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+                )
+              ),
               const SizedBox(height: 16),
 
               _buildActionCard(
                 'Book Appointment',
                 'Schedule a visit with a specialist',
+                isDark,
                 () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const AppointmentBookingScreen()));
                 },
@@ -126,17 +145,26 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildActionCard(
                 'Health Check-Up',
                 'Start a new health screening',
+                isDark,
                 () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const CheckUpScreen()));
                 },
               ),
 
               const SizedBox(height: 32),
-              const Text('Overview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
+              Text(
+                'Overview', 
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.w700, 
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+                )
+              ),
               const SizedBox(height: 16),
 
               // Last Check-up Summary
               Card(
+                color: theme.cardTheme.color,
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
@@ -145,20 +173,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Last Check-up', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1A1A1A))),
+                          Text(
+                            'Last Check-up', 
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700, 
+                              fontSize: 16, 
+                              color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+                            )
+                          ),
                           const Text('Oct 24, 2023', style: TextStyle(color: Color(0xFF888888), fontSize: 13)),
                         ],
                       ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Divider(color: Color(0xFFF0F0F0), height: 1),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Divider(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0), height: 1),
                       ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatItem('98.6°F', 'Temp'),
-                          _buildStatItem('72 BPM', 'Heart Rate'),
-                          _buildStatItem('120/80', 'BP'),
+                          _buildStatItem('98.6°F', 'Temp', isDark),
+                          _buildStatItem('72 BPM', 'Heart Rate', isDark),
+                          _buildStatItem('120/80', 'BP', isDark),
                         ],
                       ),
                     ],
@@ -173,16 +208,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActionCard(String title, String subtitle, VoidCallback onTap) {
+  Widget _buildActionCard(String title, String subtitle, bool isDark, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1C1C1C) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFF0F0F0)),
+          border: Border.all(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
         ),
         child: Row(
           children: [
@@ -190,23 +225,40 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1A1A1A))),
+                  Text(
+                    title, 
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700, 
+                      fontSize: 16, 
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+                    )
+                  ),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(color: Color(0xFF888888), fontSize: 13, fontWeight: FontWeight.w400)),
+                  Text(
+                    subtitle, 
+                    style: const TextStyle(color: Color(0xFF888888), fontSize: 13, fontWeight: FontWeight.w400)
+                  ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Color(0xFF1A1A1A), size: 20),
+            Icon(Icons.chevron_right, color: isDark ? Colors.white : const Color(0xFF1A1A1A), size: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatItem(String value, String label) {
+  Widget _buildStatItem(String value, String label, bool isDark) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF1A1A1A))),
+        Text(
+          value, 
+          style: TextStyle(
+            fontWeight: FontWeight.w700, 
+            fontSize: 18, 
+            color: isDark ? Colors.white : const Color(0xFF1A1A1A)
+          )
+        ),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(color: Color(0xFF888888), fontSize: 12, fontWeight: FontWeight.w500)),
       ],
