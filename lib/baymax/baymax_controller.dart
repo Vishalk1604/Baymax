@@ -113,10 +113,14 @@ class BaymaxController {
         'SpO2: ${vitals.spo2Percent.toStringAsFixed(0)}%, '
         'HR: ${vitals.heartRateBpm} bpm';
 
-    final llmResult = await llmService.symptomStandardizer(
-      rawDescription: rawDescription,
-      vitalsHint: vitalsHint,
-    );
+    // Nothing to analyse → no LLM call; vitals-derived symptoms still apply.
+    final description = rawDescription.trim();
+    final llmResult = description.isEmpty
+        ? const LlmSymptomResult(symptoms: [], success: true)
+        : await llmService.symptomStandardizer(
+            rawDescription: description,
+            vitalsHint: vitalsHint,
+          );
 
     final allSymptoms = {
       ...vitalsSymptoms,
@@ -205,7 +209,10 @@ class BaymaxController {
   // ESCALATION & HELPERS
   // ══════════════════════════════════════════════════════════════════════════
   RecommendationResult buildEscalationResult({String? reason}) {
-    final escalationReason = reason ?? _safetyResult?.escalationReason ?? 'Symptoms require medical evaluation.';
+    // Every escalation reason carries its own call to action.
+    final escalationReason = reason ??
+        _safetyResult?.escalationReason ??
+        'Your symptoms need a medical evaluation. Please see a doctor.';
     return RecommendationResult(
       primaryMedication: Medication.none,
       dosing: Medication.none.standardAdultDosing,
@@ -213,7 +220,7 @@ class BaymaxController {
       vitalsAlert: _patientInput?.vitals.alert,
       escalateToDoctor: true,
       escalationReason: escalationReason,
-      summary: '⚠️ URGENT: $escalationReason Please consult a doctor immediately.',
+      summary: '⚠️ URGENT: $escalationReason',
       isWithinOtcBoundary: false,
     );
   }

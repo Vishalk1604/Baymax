@@ -1,130 +1,49 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:provider/provider.dart';
-import 'screens/login_screen.dart';
-import 'screens/main_navigation.dart';
-import 'screens/settings_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'app.dart';
+import 'config/app_config.dart';
+import 'config/demo_firebase_options.dart';
+import 'core/glass/glass_runtime.dart';
+import 'features/auth/firebase_setup_screen.dart';
+import 'firebase_options.dart';
 import 'services/notification_service.dart';
 import 'services/settings_service.dart';
 
-// Import the dotenv package
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Load environment variables from .env file
-  await dotenv.load(fileName: ".env");
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(['Figtree'], await rootBundle.loadString('assets/fonts/OFL-Figtree.txt'));
+  });
 
-  await Firebase.initializeApp();
-  await NotificationService().init();
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => SettingsService()),
-      ],
-      child: const BaymaxApp(),
-    ),
-  );
-}
+  final settings = SettingsService();
+  await settings.load();
+  await GlassRuntime.init();
 
-class BaymaxApp extends StatelessWidget {
-  const BaymaxApp({super.key});
+  // Emulator test builds always use the "demo-" options, so they can never
+  // reach the real project, even after `flutterfire configure`.
+  final options =
+      AppConfig.useFirebaseEmulator ? DemoFirebaseOptions.android : DefaultFirebaseOptions.currentPlatform;
 
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<SettingsService>(
-      builder: (context, settings, child) {
-        final isDark = settings.isDarkMode;
-        
-        return MaterialApp(
-          title: 'Baymax Health',
-          debugShowCheckedModeBanner: false,
-          themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-          routes: {
-            '/settings': (context) => const SettingsScreen(),
-          },
-          theme: ThemeData(
-            useMaterial3: true,
-            fontFamily: 'Roboto',
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF1A1A1A),
-              primary: const Color(0xFF1A1A1A),
-              surface: const Color(0xFFF5F5F5),
-              background: const Color(0xFFF5F5F5),
-              brightness: Brightness.light,
-            ),
-            scaffoldBackgroundColor: const Color(0xFFF5F5F5),
-            cardTheme: CardThemeData(
-              elevation: 0,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: Color(0xFFF0F0F0)),
-              ),
-            ),
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF1A1A1A),
-              elevation: 0,
-              centerTitle: true,
-              titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
-              iconTheme: IconThemeData(color: Colors.white),
-            ),
-            textTheme: const TextTheme(
-              headlineLarge: TextStyle(color: Color(0xFF1A1A1A), fontWeight: FontWeight.w700, fontSize: 32),
-              titleLarge: TextStyle(color: Color(0xFF1A1A1A), fontWeight: FontWeight.w600, fontSize: 20),
-              bodyLarge: TextStyle(color: Color(0xFF1A1A1A), fontWeight: FontWeight.w500, fontSize: 15),
-              bodyMedium: TextStyle(color: Color(0xFF888888), fontWeight: FontWeight.w400, fontSize: 13),
-              labelLarge: TextStyle(color: Color(0xFF888888), fontWeight: FontWeight.w500, fontSize: 12),
-            ),
-          ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            fontFamily: 'Roboto',
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.white,
-              primary: Colors.white,
-              surface: const Color(0xFF2C2C2C),
-              background: const Color(0xFF121212),
-              brightness: Brightness.dark,
-            ),
-            scaffoldBackgroundColor: const Color(0xFF121212),
-            cardTheme: CardThemeData(
-              elevation: 0,
-              color: const Color(0xFF1C1C1C),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: Color(0xFF2C2C2C)),
-              ),
-            ),
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF000000),
-              elevation: 0,
-              centerTitle: true,
-              titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
-              iconTheme: IconThemeData(color: Colors.white),
-            ),
-            textTheme: const TextTheme(
-              headlineLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 32),
-              titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 20),
-              bodyLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15),
-              bodyMedium: TextStyle(color: Color(0xFFAAAAAA), fontWeight: FontWeight.w400, fontSize: 13),
-              labelLarge: TextStyle(color: Color(0xFFAAAAAA), fontWeight: FontWeight.w500, fontSize: 12),
-            ),
-          ),
-          home: StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(body: Center(child: CircularProgressIndicator()));
-              }
-              if (snapshot.hasData) return const MainNavigation();
-              return const LoginScreen();
-            },
-          ),
-        );
-      },
-    );
+  // No real Firebase project is configured yet: explain how to connect one
+  // instead of failing on sign-in.
+  if (DemoFirebaseOptions.isDemo(options) && !AppConfig.useFirebaseEmulator) {
+    runApp(FirebaseSetupApp(settings: settings));
+    return;
   }
+
+  await Firebase.initializeApp(options: options);
+  if (AppConfig.useFirebaseEmulator) {
+    final host = AppConfig.firebaseEmulatorHost;
+    await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+  }
+  await NotificationService().init();
+
+  runApp(BaymaxApp(settings: settings));
 }

@@ -1,46 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// App preferences, persisted on the device.
 class SettingsService extends ChangeNotifier {
-  static final SettingsService _instance = SettingsService._internal();
-  factory SettingsService() => _instance;
-  SettingsService._internal() {
-    _loadSettings();
-  }
+  static const _kTheme = 'settings.themeMode';
+  static const _kLegacyDark = 'isDarkMode';
+  static const _kTempUnit = 'tempUnit';
+  static const notificationsKey = 'notificationsEnabled';
 
-  bool _isDarkMode = false;
-  bool get isDarkMode => _isDarkMode;
+  ThemeMode _themeMode = ThemeMode.system;
+  bool _fahrenheit = false;
+  bool _notifications = true;
 
-  String _tempUnit = 'Celsius'; // 'Celsius' or 'Fahrenheit'
-  String get tempUnit => _tempUnit;
+  ThemeMode get themeMode => _themeMode;
+  bool get fahrenheit => _fahrenheit;
+  bool get notificationsEnabled => _notifications;
 
-  Future<void> _loadSettings() async {
+  Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    _isDarkMode = prefs.getBool('isDarkMode') ?? false;
-    _tempUnit = prefs.getString('tempUnit') ?? 'Celsius';
-    notifyListeners();
-  }
-
-  Future<void> toggleTheme(bool val) async {
-    _isDarkMode = val;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkMode', val);
-    notifyListeners();
-  }
-
-  Future<void> setTempUnit(String unit) async {
-    _tempUnit = unit;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('tempUnit', unit);
-    notifyListeners();
-  }
-
-  String formatTemp(double celsius) {
-    if (_tempUnit == 'Fahrenheit') {
-      double f = (celsius * 9 / 5) + 32;
-      return "${f.round()}°F";
-    } else {
-      return "${celsius.toStringAsFixed(1)}°C";
+    final stored = prefs.getString(_kTheme);
+    if (stored != null) {
+      _themeMode = ThemeMode.values.firstWhere((m) => m.name == stored, orElse: () => ThemeMode.system);
+    } else if (prefs.containsKey(_kLegacyDark)) {
+      // Earlier versions only had an on/off dark mode switch.
+      _themeMode = (prefs.getBool(_kLegacyDark) ?? false) ? ThemeMode.dark : ThemeMode.light;
     }
+    _fahrenheit = prefs.getString(_kTempUnit) == 'Fahrenheit';
+    _notifications = prefs.getBool(notificationsKey) ?? true;
+    notifyListeners();
   }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kTheme, mode.name);
+  }
+
+  Future<void> setFahrenheit(bool value) async {
+    _fahrenheit = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kTempUnit, value ? 'Fahrenheit' : 'Celsius');
+  }
+
+  Future<void> setNotifications(bool value) async {
+    _notifications = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(notificationsKey, value);
+  }
+
+  /// Body temperature in the chosen unit, e.g. "36.8 °C".
+  String formatTemp(double celsius, {bool unit = true}) {
+    if (_fahrenheit) {
+      final f = celsius * 9 / 5 + 32;
+      return '${f.toStringAsFixed(1)}${unit ? ' °F' : ''}';
+    }
+    return '${celsius.toStringAsFixed(1)}${unit ? ' °C' : ''}';
+  }
+
+  String get tempUnitLabel => _fahrenheit ? '°F' : '°C';
 }

@@ -1,3 +1,16 @@
+# ── Secrets — NEVER commit ─────────────────────────────────────────────────
+# .env holds the NVIDIA and Geoapify API keys (read by lib/config/app_config.dart).
+# Copy .env.example to .env and fill in your own key.
+.env
+.env.*
+!.env.example
+
+# Machine-specific SDK paths written by the Flutter tooling.
+android/local.properties
+android/key.properties
+*.jks
+*.keystore
+
 # Miscellaneous
 *.class
 *.log
@@ -44,5 +57,8 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Environment variables file
-.env
+# Firebase Local Emulator Suite data (local test accounts and documents)
+.emulator-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

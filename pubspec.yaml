@@ -1,5 +1,5 @@
 name: baymaxv1
-description: "A new Flutter project."
+description: "Baymax — personal health companion: vitals check-ups with the Baymax device, OTC guidance with safety checks, medication reminders and clinic visits."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -12,7 +12,6 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   firebase_core: ^3.10.1
-  flutter_dotenv: ^5.2.0
   firebase_auth: ^5.4.4
   cloud_firestore: ^5.6.2
   shared_preferences: ^2.2.2
@@ -28,6 +27,8 @@ dependencies:
   share_plus: ^10.1.2
   geolocator: ^13.0.2
   url_launcher: ^6.3.1
+  flutter_timezone: ^5.1.1
+  package_info_plus: ^9.0.1
 
 dev_dependencies:
   flutter_test:
@@ -36,5 +37,14 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  shaders:
+    - shaders/liquid_glass.frag
+
   assets:
-    - .env
+    - assets/fonts/OFL-Figtree.txt
+
+  fonts:
+    - family: Figtree
+      fonts:
+        - asset: assets/fonts/Figtree-Variable.ttf

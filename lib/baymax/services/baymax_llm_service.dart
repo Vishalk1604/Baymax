@@ -3,10 +3,13 @@
 // Two LLM-powered functions:
 //   1. symptomStandardizer() — converts free-text → StandardSymptom list
 //   2. evaluateVerificationAnswer() — interprets user answer → option index
-// Uses GitHub Models API (OpenAI-compatible).
+// Uses any OpenAI-compatible chat-completions API; the default is NVIDIA's
+// (build.nvidia.com). The LLM only reads text — every medical decision is made
+// by the rule engine.
 // =============================================================================
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import '../models/baymax_models.dart';
 
@@ -21,12 +24,17 @@ class BaymaxLlmConfig {
   final int maxTokens;
   final Duration timeout;
 
+  /// Send OpenAI's `response_format: json_object`. Off by default: not every
+  /// model on NVIDIA's API accepts it, and replies are parsed leniently anyway.
+  final bool jsonMode;
+
   const BaymaxLlmConfig({
-    this.baseUrl = 'https://models.github.ai/inference/chat/completions',
+    this.baseUrl = 'https://integrate.api.nvidia.com/v1/chat/completions',
     required this.apiKey,
-    this.model = 'openai/gpt-4o-mini',
+    this.model = 'nvidia/nemotron-3.5-bolt-e4b',
     this.maxTokens = 500,
-    this.timeout = const Duration(seconds: 20),
+    this.timeout = const Duration(seconds: 30),
+    this.jsonMode = false,
   });
 }
 
@@ -92,10 +100,17 @@ class BaymaxLlmService {
   BaymaxLlmService({required this.config, http.Client? client})
       : _client = client ?? http.Client();
 
+  static const String _missingKeyError =
+      'No LLM API key configured. Run with --dart-define-from-file=.env (see .env.example).';
+
   Future<LlmSymptomResult> symptomStandardizer({
     required String rawDescription,
     String? vitalsHint,
   }) async {
+    if (config.apiKey.isEmpty) {
+      return const LlmSymptomResult(symptoms: [], success: false, error: _missingKeyError);
+    }
+
     final systemPrompt = '''
 You are a medical symptom extractor. Analyze the user's description and map to standardized symptoms.
 RETURN JSON ONLY: {"symptoms": ["symptom1", "symptom2"]}
@@ -119,22 +134,16 @@ $_symptomTaxonomyJson
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${config.apiKey}',
         },
-        body: jsonEncode({
-          'model': config.model,
-          'messages': [
-            {'role': 'system', 'content': systemPrompt},
-            {'role': 'user', 'content': userMessage}
-          ],
-          'response_format': {'type': 'json_object'}
-        }),
+        body: jsonEncode(_requestBody(systemPrompt, userMessage)),
       ).timeout(config.timeout);
 
       if (response.statusCode != 200) {
+        debugPrint('Symptom reader HTTP ${response.statusCode}: ${_brief(response.body)}');
         return LlmSymptomResult(symptoms: [], success: false, error: 'API Error ${response.statusCode}');
       }
 
       final decoded = jsonDecode(response.body);
-      final content = jsonDecode(decoded['choices'][0]['message']['content']);
+      final content = decodeJsonContent('${decoded['choices'][0]['message']['content']}');
       
       List<dynamic> rawList = content['symptoms'] ?? [];
 
@@ -154,6 +163,10 @@ $_symptomTaxonomyJson
     required String userAnswer,
     String? patientContext,
   }) async {
+    if (config.apiKey.isEmpty) {
+      return const LlmVerificationResult(optionIndex: -1, success: false, error: _missingKeyError);
+    }
+
     final optionList = question.options.asMap().entries.map((e) => '${e.key}: "${e.value}"').join('\n');
     final systemPrompt = '''
 Map the patient's answer to the closest option index (0-based).
@@ -173,22 +186,16 @@ INTERNAL CONTEXT: ${question.context ?? 'None'}
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${config.apiKey}',
         },
-        body: jsonEncode({
-          'model': config.model,
-          'messages': [
-            {'role': 'system', 'content': systemPrompt},
-            {'role': 'user', 'content': userMessage}
-          ],
-          'response_format': {'type': 'json_object'}
-        }),
+        body: jsonEncode(_requestBody(systemPrompt, userMessage)),
       ).timeout(config.timeout);
 
       if (response.statusCode != 200) {
+        debugPrint('Answer reader HTTP ${response.statusCode}: ${_brief(response.body)}');
         return LlmVerificationResult(optionIndex: -1, success: false, error: 'API Error');
       }
 
       final decoded = jsonDecode(response.body);
-      final content = jsonDecode(decoded['choices'][0]['message']['content']);
+      final content = decodeJsonContent('${decoded['choices'][0]['message']['content']}');
       return LlmVerificationResult(
         optionIndex: (content['index'] as num).toInt(),
         success: true,
@@ -197,6 +204,32 @@ INTERNAL CONTEXT: ${question.context ?? 'None'}
     } catch (e) {
       return LlmVerificationResult(optionIndex: -1, success: false, error: 'Error: $e');
     }
+  }
+
+  Map<String, Object?> _requestBody(String systemPrompt, String userMessage) => {
+        'model': config.model,
+        'messages': [
+          {'role': 'system', 'content': systemPrompt},
+          {'role': 'user', 'content': userMessage},
+        ],
+        // Extraction, not conversation: keep it close to deterministic.
+        'temperature': 0.1,
+        'max_tokens': config.maxTokens,
+        if (config.jsonMode) 'response_format': {'type': 'json_object'},
+      };
+
+  static String _brief(String body) => body.length > 300 ? '${body.substring(0, 300)}…' : body;
+
+  /// Parses the JSON object in a model reply, tolerating ```json fences and
+  /// text around it (common without OpenAI's JSON mode).
+  static Map<String, dynamic> decodeJsonContent(String content) {
+    var text = content.trim();
+    final fence = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(text);
+    if (fence != null) text = fence.group(1)!.trim();
+    final start = text.indexOf('{');
+    final end = text.lastIndexOf('}');
+    if (start < 0 || end < start) throw const FormatException('No JSON object in the model reply');
+    return jsonDecode(text.substring(start, end + 1)) as Map<String, dynamic>;
   }
 
   StandardSymptom? _parseSymptom(String name) {

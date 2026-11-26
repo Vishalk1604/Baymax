@@ -72,11 +72,12 @@ class BaymaxCaseEngine {
           id: 'C01_Q1_A',
           question: 'Do you have any of the following history or symptoms?',
           options: [
-            'Stomach pain or liver disease',
+            'Liver disease or heavy alcohol use',
             'Severe breathing difficulty',
             'None of the above',
           ],
-          context: 'Checking for Paracetamol contraindications or severe respiratory issues.',
+          context: 'Liver disease/alcohol (0) -> doctor, paracetamol is unsafe. '
+              'Breathing difficulty (1) -> Red Alert. None (2) -> Paracetamol + Cetirizine.',
         ),
       );
     }
@@ -98,7 +99,8 @@ class BaymaxCaseEngine {
             'Asthma that gets worse with painkillers',
             'None of these apply to me',
           ],
-          context: 'Blood/Stool options -> Red Alert. Others -> Paracetamol. None -> Ibuprofen.',
+          context: 'Black stool (1) or vomiting blood (2) -> Red Alert. '
+              'Stomach, kidney or asthma (0, 3, 4) -> Paracetamol. None (5) -> Paracetamol.',
         ),
       );
     }
@@ -193,7 +195,21 @@ class BaymaxDecisionEngine {
     required Set<Medication> blockedMedications,
     required List<StandardSymptom> symptoms,
   }) {
-    final bool declined = verificationAnswerIndex < 0;
+    // Every question is a safety screen. If we can't tell which option the
+    // user picked (LLM couldn't map a free-text answer, or a bad index), we
+    // must not assume "none of the above" — refer instead.
+    final optionCount = matchedCase.verificationQuestion.options.length;
+    if (verificationAnswerIndex < 0 || verificationAnswerIndex >= optionCount) {
+      return const MedicationDecision(
+        primary: Medication.none,
+        rationale: '',
+        escalationRequired: true,
+        escalationReason:
+            "We couldn't confirm your answer to the safety question, so we can't recommend a medicine. "
+            'Please speak to a pharmacist or doctor.',
+      );
+    }
+
     Medication primary = Medication.none;
     Medication? secondary;
     String rationale = '';
@@ -202,23 +218,24 @@ class BaymaxDecisionEngine {
 
     switch (matchedCase.caseId) {
       case 'C01_ALLERGY': // Fever/Pain + Allergies (Co-medication)
-        if (verificationAnswerIndex == 1) {
+        if (verificationAnswerIndex == 0) {
+          escalate = true;
+          escalationReason =
+              "Paracetamol isn't safe with liver disease or heavy alcohol use. "
+              'Please ask a doctor or pharmacist which fever medicine is right for you.';
+        } else if (verificationAnswerIndex == 1) {
           escalate = true;
           escalationReason = 'RED ALERT: Severe breathing difficulty detected. Seek emergency care immediately.';
         } else {
           primary = Medication.paracetamol;
           secondary = Medication.cetirizine;
-          rationale = ''; 
-          if (verificationAnswerIndex == 0) {
-            rationale = '(Note: Caution advised with liver history).';
-          }
         }
         break;
 
       case 'C01': // Fever (+ optional Pain)
-        if (declined || verificationAnswerIndex == 5) {
+        if (verificationAnswerIndex == 5) {
           primary = Medication.paracetamol;
-          rationale = ''; 
+          rationale = '';
         } else if (verificationAnswerIndex == 1 || verificationAnswerIndex == 2) {
           escalate = true;
           escalationReason = 'RED ALERT: Possible GI bleeding detected. Please seek emergency care immediately.';
@@ -230,7 +247,7 @@ class BaymaxDecisionEngine {
         break;
 
       case 'C03': // GI Acid
-        if (verificationAnswerIndex < 3 && !declined) {
+        if (verificationAnswerIndex < 3) {
           escalate = true;
           escalationReason = 'RED ALERT: Severe GI symptoms or bleeding signs detected. Emergency medical evaluation required.';
         } else {
@@ -240,7 +257,7 @@ class BaymaxDecisionEngine {
         break;
 
       case 'C04': // Allergy
-        if (verificationAnswerIndex == 0 && !declined) {
+        if (verificationAnswerIndex == 0) {
           escalate = true;
           escalationReason = 'RED ALERT: Facial/lip swelling suggests a severe allergic reaction (Anaphylaxis). Call emergency services immediately.';
         } else {
@@ -250,7 +267,7 @@ class BaymaxDecisionEngine {
         break;
 
       case 'C05': // Dehydration
-        if (verificationAnswerIndex < 2 && !declined) {
+        if (verificationAnswerIndex < 2) {
           escalate = true;
           escalationReason = 'RED ALERT: Severe dehydration or systemic failure signs. Immediate medical intervention required.';
         } else {
@@ -275,16 +292,28 @@ class BaymaxDecisionEngine {
         break;
     }
 
-    // Safety Override
+    // Safety override — primary medication
     if (blockedMedications.contains(primary)) {
       if (primary == Medication.ibuprofen && !blockedMedications.contains(Medication.paracetamol)) {
         primary = Medication.paracetamol;
         rationale += ' [Switching to Paracetamol as Ibuprofen is contraindicated for you.]';
       } else {
         primary = Medication.none;
+        secondary = null;
         escalate = true;
         escalationReason ??= 'The safest medication for your case is blocked by your medical profile. Please consult a doctor.';
       }
+    }
+
+    // Safety override — co-medication gets the same check as the primary
+    if (secondary != null && blockedMedications.contains(secondary)) {
+      rationale += ' [${secondary.displayName} left out — it is not suitable for your medical profile.]';
+      secondary = null;
+    }
+
+    if (escalate) {
+      primary = Medication.none;
+      secondary = null;
     }
 
     return MedicationDecision(

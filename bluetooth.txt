@@ -1,0 +1,664 @@
+# Flutter App - Bluetooth Integration Guide
+
+## Overview
+This guide shows how to connect your Flutter app to the BAYMAX health monitor device via Bluetooth.
+
+## Device Details
+- **Device Name**: BAYMAX
+- **Baud Rate**: N/A (Bluetooth uses default settings)
+- **Communication Protocol**: String-based serial over Bluetooth
+- **Commands**: `start\n` (to initiate measurement)
+- **Responses**: ACK, STATUS messages, DATA with results
+
+---
+
+## Step 1: Add Dependencies
+
+Update your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_bluetooth_serial: ^0.4.0
+  # OR use flutter_blue for more features:
+  # flutter_blue: ^0.8.0
+```
+
+Run:
+```bash
+flutter pub get
+```
+
+---
+
+## Step 2: Android & iOS Permissions
+
+### Android (android/app/src/main/AndroidManifest.xml)
+```xml
+<uses-permission android:name="android.permission.BLUETOOTH" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+```
+
+### iOS (ios/Runner/Info.plist)
+```xml
+<key>NSBluetoothPeripheralUsageDescription</key>
+<string>This app needs access to Bluetooth to communicate with the health monitor</string>
+<key>NSBluetoothCentralUsageDescription</key>
+<string>This app needs access to Bluetooth to communicate with the health monitor</string>
+```
+
+---
+
+## Step 3: Bluetooth Service Class
+
+Create `lib/services/bluetooth_service.dart`:
+
+```dart
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'dart:async';
+
+class BluetoothService {
+  static final BluetoothService _instance = BluetoothService._internal();
+
+  factory BluetoothService() {
+    return _instance;
+  }
+
+  BluetoothService._internal();
+
+  BluetoothConnection? connection;
+  bool isConnected = false;
+
+  final StreamController<String> messageController = StreamController.broadcast();
+  Stream<String> get messages => messageController.stream;
+
+  // Get available Bluetooth devices
+  Future<List<BluetoothDevice>> getAvailableDevices() async {
+    try {
+      final devices = await FlutterBluetoothSerial.instance.getBondedDevices();
+      return devices ?? [];
+    } catch (e) {
+      print('Error getting devices: $e');
+      return [];
+    }
+  }
+
+  // Connect to device
+  Future<bool> connectToDevice(BluetoothDevice device) async {
+    try {
+      connection = await BluetoothConnection.toAddress(device.address);
+      isConnected = true;
+
+      // Listen for incoming messages
+      connection!.input!.listen((Uint8List data) {
+        String message = String.fromCharCodes(data);
+        messageController.add(message);
+      }).onDone(() {
+        disconnect();
+      });
+
+      return true;
+    } catch (e) {
+      print('Connection error: $e');
+      isConnected = false;
+      return false;
+    }
+  }
+
+  // Send command to device
+  Future<bool> sendCommand(String command) async {
+    if (!isConnected || connection == null) {
+      print('Not connected to device');
+      return false;
+    }
+
+    try {
+      connection!.output.add(command.codeUnits);
+      await connection!.output.allSent;
+      return true;
+    } catch (e) {
+      print('Send error: $e');
+      return false;
+    }
+  }
+
+  // Disconnect
+  void disconnect() {
+    if (connection != null) {
+      connection!.dispose();
+      connection = null;
+      isConnected = false;
+    }
+  }
+
+  // Dispose resources
+  void dispose() {
+    messageController.close();
+    disconnect();
+  }
+}
+```
+
+---
+
+## Step 4: Health Device Service
+
+Create `lib/services/health_device_service.dart`:
+
+```dart
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'bluetooth_service.dart';
+
+class HealthReading {
+  final int heartRate;
+  final int spo2;
+  final double temperature;
+
+  HealthReading({
+    required this.heartRate,
+    required this.spo2,
+    required this.temperature,
+  });
+
+  @override
+  String toString() => 'HR: $heartRate bpm, SpO2: $spo2%, Temp: ${temperature.toStringAsFixed(2)}°C';
+}
+
+class HealthDeviceService {
+  static final HealthDeviceService _instance = HealthDeviceService._internal();
+
+  factory HealthDeviceService() {
+    return _instance;
+  }
+
+  HealthDeviceService._internal();
+
+  final BluetoothService _bluetoothService = BluetoothService();
+  HealthReading? lastReading;
+
+  String measurementStatus = 'Idle';
+  bool isMeasuring = false;
+
+  // Get available devices (shows BAYMAX if paired)
+  Future<List<BluetoothDevice>> getAvailableDevices() async {
+    return await _bluetoothService.getAvailableDevices();
+  }
+
+  // Find and connect to BAYMAX
+  Future<bool> connectToBAYMAX() async {
+    try {
+      final devices = await getAvailableDevices();
+
+      // Find BAYMAX in paired devices
+      BluetoothDevice? baymaxDevice;
+      for (var device in devices) {
+        if (device.name == 'BAYMAX') {
+          baymaxDevice = device;
+          break;
+        }
+      }
+
+      if (baymaxDevice == null) {
+        print('BAYMAX device not found. Please pair it first.');
+        return false;
+      }
+
+      bool connected = await _bluetoothService.connectToDevice(baymaxDevice);
+
+      if (connected) {
+        // Start listening for responses
+        _bluetoothService.messages.listen(_handleMessage);
+      }
+
+      return connected;
+    } catch (e) {
+      print('Connection error: $e');
+      return false;
+    }
+  }
+
+  // Start measurement
+  Future<bool> startMeasurement() async {
+    if (!_bluetoothService.isConnected) {
+      print('Not connected to device');
+      return false;
+    }
+
+    isMeasuring = true;
+    measurementStatus = 'Waiting...';
+
+    bool sent = await _bluetoothService.sendCommand('start\n');
+    return sent;
+  }
+
+  // Handle incoming messages
+  void _handleMessage(String message) {
+    print('Received: $message');
+
+    message = message.trim();
+
+    if (message == 'ACK') {
+      measurementStatus = 'Acknowledged, place finger on sensor';
+    }
+    else if (message.startsWith('STATUS:')) {
+      String status = message.replaceFirst('STATUS:', '');
+      if (status == 'HR_SPO2_MEASURING') {
+        measurementStatus = 'Measuring Heart Rate & SpO2...';
+      } else if (status == 'TEMP_MEASURING') {
+        measurementStatus = 'Measuring Temperature...';
+      }
+    }
+    else if (message.startsWith('DATA:')) {
+      // Parse: DATA:HR=XX,SPO2=YY,TEMP=ZZ.Z
+      _parseData(message);
+    }
+    else if (message.startsWith('SUCCESS:')) {
+      measurementStatus = 'Measurement Complete';
+      isMeasuring = false;
+    }
+    else if (message.startsWith('ERROR:')) {
+      String error = message.replaceFirst('ERROR:', '');
+      measurementStatus = 'Error: $error';
+      isMeasuring = false;
+    }
+  }
+
+  // Parse measurement data
+  void _parseData(String message) {
+    try {
+      // Format: DATA:HR=XX,SPO2=YY,TEMP=ZZ.Z
+      String data = message.replaceFirst('DATA:', '');
+
+      Map<String, String> values = {};
+      List<String> pairs = data.split(',');
+
+      for (String pair in pairs) {
+        List<String> kv = pair.split('=');
+        if (kv.length == 2) {
+          values[kv[0].trim()] = kv[1].trim();
+        }
+      }
+
+      if (values.containsKey('HR') && values.containsKey('SPO2') && values.containsKey('TEMP')) {
+        lastReading = HealthReading(
+          heartRate: int.parse(values['HR']!),
+          spo2: int.parse(values['SPO2']!),
+          temperature: double.parse(values['TEMP']!),
+        );
+
+        print('Reading parsed: $lastReading');
+      }
+    } catch (e) {
+      print('Error parsing data: $e');
+    }
+  }
+
+  // Disconnect
+  void disconnect() {
+    _bluetoothService.disconnect();
+    isMeasuring = false;
+    measurementStatus = 'Disconnected';
+  }
+
+  // Dispose
+  void dispose() {
+    _bluetoothService.dispose();
+  }
+}
+```
+
+---
+
+## Step 5: UI Implementation
+
+Create `lib/screens/health_monitor_screen.dart`:
+
+```dart
+import 'package:flutter/material.dart';
+import '../services/health_device_service.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+
+class HealthMonitorScreen extends StatefulWidget {
+  const HealthMonitorScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HealthMonitorScreen> createState() => _HealthMonitorScreenState();
+}
+
+class _HealthMonitorScreenState extends State<HealthMonitorScreen> {
+  final HealthDeviceService _deviceService = HealthDeviceService();
+  List<BluetoothDevice> availableDevices = [];
+  bool isConnected = false;
+  bool isMeasuring = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDevices();
+  }
+
+  Future<void> _loadDevices() async {
+    final devices = await _deviceService.getAvailableDevices();
+    setState(() {
+      availableDevices = devices;
+    });
+  }
+
+  Future<void> _connectToBAYMAX() async {
+    bool connected = await _deviceService.connectToBAYMAX();
+    setState(() {
+      isConnected = connected;
+    });
+
+    if (!connected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to connect to BAYMAX')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connected to BAYMAX')),
+      );
+    }
+  }
+
+  Future<void> _startMeasurement() async {
+    bool sent = await _deviceService.startMeasurement();
+    if (sent) {
+      setState(() {
+        isMeasuring = true;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to start measurement')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('BAYMAX Health Monitor'),
+        backgroundColor: Colors.blue[800],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Connection Status
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Text(
+                      isConnected ? 'Connected' : 'Disconnected',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isConnected ? Colors.green : Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _deviceService.measurementStatus,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Connect Button
+            if (!isConnected)
+              ElevatedButton.icon(
+                onPressed: _connectToBAYMAX,
+                icon: const Icon(Icons.bluetooth),
+                label: const Text('Connect to BAYMAX'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[800],
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Start Measurement Button
+                  ElevatedButton.icon(
+                    onPressed: isMeasuring ? null : _startMeasurement,
+                    icon: const Icon(Icons.favorite),
+                    label: const Text('Start Measurement'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green[700],
+                      disabledBackgroundColor: Colors.grey,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Results Display
+                  if (_deviceService.lastReading != null)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Last Reading',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _buildReadingItem(
+                              'Heart Rate',
+                              '${_deviceService.lastReading!.heartRate} bpm',
+                              Icons.favorite,
+                              Colors.red,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildReadingItem(
+                              'SpO2',
+                              '${_deviceService.lastReading!.spo2}%',
+                              Icons.air,
+                              Colors.blue,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildReadingItem(
+                              'Temperature',
+                              '${_deviceService.lastReading!.temperature.toStringAsFixed(2)}°C',
+                              Icons.thermostat,
+                              Colors.orange,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (isMeasuring)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: const [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 12),
+                            Text('Measuring...'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+
+                  // Disconnect Button
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _deviceService.disconnect();
+                      setState(() {
+                        isConnected = false;
+                      });
+                    },
+                    icon: const Icon(Icons.bluetooth_disabled),
+                    label: const Text('Disconnect'),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadingItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 28),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _deviceService.dispose();
+    super.dispose();
+  }
+}
+```
+
+---
+
+## Step 6: Main App
+
+Update `lib/main.dart`:
+
+```dart
+import 'package:flutter/material.dart';
+import 'screens/health_monitor_screen.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'BAYMAX Health Monitor',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
+      home: const HealthMonitorScreen(),
+    );
+  }
+}
+```
+
+---
+
+## Step 7: Device Pairing (Important!)
+
+Before the app can connect, you must **pair the BAYMAX device** with your phone:
+
+1. Go to **Settings → Bluetooth**
+2. Look for **"BAYMAX"** in available devices
+3. Tap to pair (may ask for PIN - usually **1234** or **0000** for HC-05/HC-06)
+4. Once paired, the app can connect
+
+---
+
+## Complete Data Flow
+
+```
+Phone (Flutter App)
+    ↓ "start\n"
+BAYMAX Device (ESP32)
+    ↓ "ACK"
+Phone receives acknowledgment
+    ↓ User places finger on sensor
+BAYMAX
+    ↓ "STATUS:HR_SPO2_MEASURING"
+Phone updates UI
+    ↓ 5 seconds later
+BAYMAX
+    ↓ "STATUS:TEMP_MEASURING"
+Phone updates UI
+    ↓ 10 seconds later
+BAYMAX
+    ↓ "DATA:HR=XX,SPO2=YY,TEMP=ZZ.Z"
+Phone parses and displays results
+    ↓ "SUCCESS:Readings complete"
+Phone shows final results
+```
+
+---
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| BAYMAX not showing in Bluetooth | Check device power, ensure pairing mode is on |
+| Connection fails | Verify PIN (usually 1234), restart Bluetooth |
+| No data received | Check message parsing, verify baud rate compatibility |
+| Partial readings | Ensure finger stays on sensor during full cycle |
+| Temperature not measuring | Check MLX90614 is connected and initialized |
+
+---
+
+## Protocol Reference
+
+### Commands
+- `start\n` - Start measurement cycle
+
+### Responses
+- `ACK` - Command acknowledged
+- `STATUS:HR_SPO2_MEASURING` - HR/SpO2 measurement in progress
+- `STATUS:TEMP_MEASURING` - Temperature measurement in progress
+- `DATA:HR=X,SPO2=Y,TEMP=Z.Z` - Complete measurement data
+- `SUCCESS:Readings complete` - Measurement finished
+- `ERROR:message` - Error occurred
+
+---
+
+## Notes
+
+- The device name is **BAYMAX** (configured in Arduino code)
+- All communication is **text-based** for easy debugging
+- Temperature precision is **2 decimal places**
+- HR and SpO2 are **integer values**
+- Device automatically resets after each measurement
+

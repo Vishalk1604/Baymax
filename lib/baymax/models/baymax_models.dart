@@ -3,6 +3,15 @@
 // All data structures, enums, and constants for the Baymax OTC algorithm.
 // =============================================================================
 
+// Enum values stay snake_case on purpose: their `.name` is the exact string the
+// LLM taxonomy uses and what profiles store in Firestore (`conditions`,
+// `allergies`). Renaming them would break both.
+// ignore_for_file: constant_identifier_names
+
+import '../core/vital_thresholds.dart';
+
+export '../core/vital_thresholds.dart';
+
 // ---------------------------------------------------------------------------
 // STANDARD SYMPTOM TAXONOMY
 // All symptoms the system understands. LLM maps free-text → these values.
@@ -145,26 +154,31 @@ extension MedicationInfo on Medication {
         Medication.paracetamol => const DosingInfo(
             dose: '650 mg',
             frequency: 'Min 6 hours apart',
-            maxDailyDose: '3 tablets',
+            maxDailyDose: '3 tablets (1,950 mg)',
             minIntervalHours: 6,
+            maxDosesPerDay: 3,
             notes: 'Take with or without food.'),
         Medication.ibuprofen => const DosingInfo(
             dose: '400 mg',
-            frequency: '6 hours apart',
-            maxDailyDose: '4 tablets',
+            frequency: '6–8 hours apart',
+            // OTC ceiling is 1,200 mg/day; more needs a doctor's supervision.
+            maxDailyDose: '3 tablets (1,200 mg)',
             minIntervalHours: 6,
+            maxDosesPerDay: 3,
             notes: 'Always take with food or milk. Stay well hydrated.'),
         Medication.cetirizine => const DosingInfo(
             dose: '10 mg',
             frequency: 'Once daily',
             maxDailyDose: '10 mg/day',
             minIntervalHours: 24,
+            maxDosesPerDay: 1,
             notes: 'May cause drowsiness. Avoid alcohol and driving.'),
         Medication.famotidine => const DosingInfo(
             dose: '10–20 mg',
             frequency: 'Once or twice daily',
             maxDailyDose: '40 mg/day',
             minIntervalHours: 12,
+            maxDosesPerDay: 2,
             notes: 'Take 15–60 min before meals for best effect.'),
         Medication.ors => const DosingInfo(
             dose: '200–400 mL per loose stool or vomiting episode',
@@ -179,6 +193,34 @@ extension MedicationInfo on Medication {
             minIntervalHours: 0,
             notes: 'No medication indicated at this time.'),
       };
+
+  /// Device compartment that holds this medicine (see firmware processCommand),
+  /// or 0 when it isn't stocked in the device.
+  int get deviceCompartment => switch (this) {
+        Medication.paracetamol => 1,
+        Medication.cetirizine => 2,
+        Medication.ibuprofen => 3,
+        Medication.famotidine => 4,
+        Medication.ors || Medication.none => 0,
+      };
+
+  /// Resolves a stored medication name (simpleName, displayName or free text
+  /// such as "Paracetamol (650mg)") back to a [Medication]. Returns null when
+  /// it isn't one of the engine's medicines.
+  static Medication? fromName(String? name) {
+    if (name == null) return null;
+    final lower = name.toLowerCase();
+    for (final med in Medication.values) {
+      if (med == Medication.none) continue;
+      if (med.simpleName.toLowerCase() == lower || med.displayName.toLowerCase() == lower) return med;
+    }
+    if (lower.contains('paracetamol') || lower.contains('acetaminophen')) return Medication.paracetamol;
+    if (lower.contains('ibuprofen')) return Medication.ibuprofen;
+    if (lower.contains('cetirizine')) return Medication.cetirizine;
+    if (lower.contains('famotidine')) return Medication.famotidine;
+    if (lower == 'ors' || lower.contains('oral rehydration')) return Medication.ors;
+    return null;
+  }
 }
 
 class DosingInfo {
@@ -186,6 +228,9 @@ class DosingInfo {
   final String frequency;
   final String maxDailyDose;
   final int minIntervalHours;
+
+  /// Maximum doses in any 24 hours; 0 means no fixed limit.
+  final int maxDosesPerDay;
   final String notes;
 
   const DosingInfo({
@@ -193,6 +238,7 @@ class DosingInfo {
     required this.frequency,
     required this.maxDailyDose,
     required this.minIntervalHours,
+    this.maxDosesPerDay = 0,
     required this.notes,
   });
 }
@@ -237,94 +283,118 @@ class VitalsReading {
     );
   }
 
-  /// Returns vitals-derived symptom tags.
+  /// Returns vitals-derived symptom tags (thresholds: [VitalThresholds]).
   List<StandardSymptom> get derivedSymptoms {
     final symptoms = <StandardSymptom>[];
+    final t = temperatureCelsius;
 
-    // Temperature interpretation — UPDATED THRESHOLDS
-    if (temperatureCelsius >= 32.8 && temperatureCelsius <= 34.4) {
-      // Normal range as per request
-    } else if (temperatureCelsius > 34.4 && temperatureCelsius <= 39.0) {
-      symptoms.add(StandardSymptom.fever);
-    } else if (temperatureCelsius > 39.0) {
+    if (t >= VitalThresholds.highFeverFrom) {
       symptoms.add(StandardSymptom.high_fever);
+    } else if (t >= VitalThresholds.feverFrom) {
+      symptoms.add(StandardSymptom.fever);
+    } else if (t >= VitalThresholds.mildFeverFrom) {
+      symptoms.add(StandardSymptom.mild_fever);
     }
 
-    // SpO2 interpretation
-    if (spo2Percent < 95.0) {
+    if (spo2Percent < VitalThresholds.spo2LowBelow) {
       symptoms.add(StandardSymptom.low_spo2);
     }
 
     return symptoms;
   }
 
-  /// Returns the vitals-level triage alert (null if all normal).
-  VitalsAlert? get alert {
-    // Critical temperature — UPDATED
-    if (temperatureCelsius > 40.0) {
-      return VitalsAlert(
+  /// Every vitals alert, most severe first.
+  ///
+  /// This is the only place vitals are graded: [alert] and the safety
+  /// engine's VitalsSafetyCheck both read from it, so the result card and the
+  /// escalation decision can never disagree.
+  List<VitalsAlert> get alerts {
+    final t = temperatureCelsius;
+    final tStr = t.toStringAsFixed(1);
+    final spo2Str = spo2Percent.toStringAsFixed(0);
+    final list = <VitalsAlert>[];
+
+    // ── Temperature ──
+    if (t > VitalThresholds.hyperpyrexiaAbove) {
+      list.add(VitalsAlert(
         level: AlertLevel.emergency,
-        message:
-            '⚠️ HYPERPYREXIA: Temperature ${temperatureCelsius.toStringAsFixed(1)}°C is life-threatening. Seek emergency care immediately.',
         vital: 'temperature',
-      );
-    }
-    // Hypothermia adjusted based on new "Normal" floor of 32.8
-    if (temperatureCelsius < 32.0) {
-      return VitalsAlert(
+        message: 'Hyperpyrexia: temperature $tStr°C is dangerously high. Seek emergency care immediately.',
+      ));
+    } else if (t < VitalThresholds.hypothermiaBelow) {
+      list.add(VitalsAlert(
         level: AlertLevel.emergency,
-        message:
-            '⚠️ HYPOTHERMIA: Temperature ${temperatureCelsius.toStringAsFixed(1)}°C is critically low. Seek emergency care immediately.',
         vital: 'temperature',
-      );
+        message: 'Hypothermia: temperature $tStr°C is dangerously low. Seek emergency care immediately.',
+      ));
+    } else if (t >= VitalThresholds.veryHighFeverFrom) {
+      list.add(VitalsAlert(
+        level: AlertLevel.warning,
+        vital: 'temperature',
+        message: 'Very high fever ($tStr°C). Medicine only helps temporarily — see a doctor within 24 hours.',
+      ));
+    } else if (t >= VitalThresholds.highFeverFrom) {
+      list.add(VitalsAlert(
+        level: AlertLevel.warning,
+        vital: 'temperature',
+        message: 'High fever ($tStr°C). See a doctor if it does not come down or lasts more than 2 days.',
+      ));
+    } else if (t < VitalThresholds.normalFrom) {
+      list.add(VitalsAlert(
+        level: AlertLevel.info,
+        vital: 'temperature',
+        message: 'Temperature $tStr°C is slightly below normal. Keep warm and measure again.',
+      ));
     }
 
-    // Critical SpO2
-    if (spo2Percent < 90.0) {
-      return VitalsAlert(
+    // ── SpO2 ──
+    if (spo2Percent < VitalThresholds.spo2CriticalBelow) {
+      list.add(VitalsAlert(
         level: AlertLevel.emergency,
-        message:
-            '🆘 CRITICAL SpO₂: ${spo2Percent.toStringAsFixed(0)}%. Oxygen saturation is dangerously low. Call emergency services NOW.',
         vital: 'spo2',
-      );
-    }
-    if (spo2Percent < 95.0) {
-      return VitalsAlert(
+        message: 'Critical SpO₂ ($spo2Str%): oxygen level is dangerously low. Call emergency services now.',
+      ));
+    } else if (spo2Percent < VitalThresholds.spo2LowBelow) {
+      list.add(VitalsAlert(
         level: AlertLevel.warning,
-        message:
-            '⚠️ LOW SpO₂: ${spo2Percent.toStringAsFixed(0)}%. Below normal range (95–100%). Seek medical evaluation.',
         vital: 'spo2',
-      );
+        message: 'Low SpO₂ ($spo2Str%, normal is 95–100%). Measure again at rest; see a doctor if it stays low.',
+      ));
     }
 
-    // Critical heart rate
-    if (heartRateBpm > 130) {
-      return VitalsAlert(
+    // ── Heart rate ──
+    if (heartRateBpm > VitalThresholds.severeTachycardiaAbove) {
+      list.add(VitalsAlert(
         level: AlertLevel.emergency,
-        message:
-            '⚠️ SEVERE TACHYCARDIA: Heart rate $heartRateBpm bpm. Seek emergency care.',
         vital: 'heartRate',
-      );
-    }
-    if (heartRateBpm > 100) {
-      return VitalsAlert(
+        message: 'Severe tachycardia: heart rate $heartRateBpm bpm. Seek emergency care immediately.',
+      ));
+    } else if (heartRateBpm > VitalThresholds.tachycardiaAbove) {
+      list.add(VitalsAlert(
         level: AlertLevel.warning,
-        message:
-            '⚠️ TACHYCARDIA: Heart rate $heartRateBpm bpm. Elevated. Monitor and seek care if persistent.',
         vital: 'heartRate',
-      );
-    }
-    if (heartRateBpm < 50) {
-      return VitalsAlert(
+        message: 'Elevated heart rate ($heartRateBpm bpm). Rest and measure again; see a doctor if it stays high.',
+      ));
+    } else if (heartRateBpm < VitalThresholds.bradycardiaBelow) {
+      list.add(VitalsAlert(
         level: AlertLevel.warning,
-        message:
-            '⚠️ BRADYCARDIA: Heart rate $heartRateBpm bpm. Below normal (60–100). Seek medical evaluation.',
         vital: 'heartRate',
-      );
+        message: 'Low heart rate ($heartRateBpm bpm, normal is 60–100). See a doctor if you feel dizzy or faint.',
+      ));
     }
 
-    return null;
+    list.sort((a, b) => b.level.index.compareTo(a.level.index));
+    return list;
   }
+
+  /// The most severe vitals alert, or null if all vitals are normal.
+  VitalsAlert? get alert {
+    final all = alerts;
+    return all.isEmpty ? null : all.first;
+  }
+
+  /// True when any vital is in the emergency range.
+  bool get isCritical => alerts.any((a) => a.level == AlertLevel.emergency);
 }
 
 // ---------------------------------------------------------------------------

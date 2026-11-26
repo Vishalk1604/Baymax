@@ -42,6 +42,9 @@ class SafetyCheckResult {
 // ---------------------------------------------------------------------------
 // CONSTANTS — RED FLAG SYMPTOMS
 // Any one of these triggers immediate escalation; no OTC recommendation.
+//
+// `low_spo2` is deliberately NOT here: SpO2 is graded by VitalsSafetyCheck
+// (< 90 % emergency, 90–94 % warning), per docs/IMPLEMENTATION.md §7.
 // ---------------------------------------------------------------------------
 
 class RedFlagConstants {
@@ -52,9 +55,11 @@ class RedFlagConstants {
     StandardSymptom.confusion,
     StandardSymptom.seizures,
     StandardSymptom.fainting,
-    StandardSymptom.low_spo2,
     StandardSymptom.severe_weakness,
     StandardSymptom.no_urine,
+    // Added 2026-11-25 after the doctor review (owner's decision; needs re-review):
+    StandardSymptom.chest_tightness,
+    StandardSymptom.persistent_vomiting,
   };
 
   static const Set<StandardSymptom> anaphylaxisMarkers = {
@@ -84,12 +89,15 @@ class RedFlagConstants {
         'Seizures reported. Emergency referral required immediately.',
     StandardSymptom.fainting:
         'Fainting/loss of consciousness — possible cardiac or neurological cause. Seek emergency care.',
-    StandardSymptom.low_spo2:
-        'Low SpO₂ detected. Seek emergency care.',
     StandardSymptom.severe_weakness:
         'Severe weakness reported. May indicate serious systemic illness. Seek emergency care.',
     StandardSymptom.no_urine:
         'No urine output — possible acute kidney injury or severe dehydration. Seek emergency care immediately.',
+    StandardSymptom.chest_tightness:
+        'Chest tightness — can have a heart or lung cause and needs an urgent medical check. Do not self-medicate.',
+    StandardSymptom.persistent_vomiting:
+        "Persistent vomiting (can't keep anything down) — risk of dehydration, and medicine taken by mouth "
+            "won't stay down. Seek urgent medical care.",
   };
 }
 
@@ -99,91 +107,28 @@ class RedFlagConstants {
 // ---------------------------------------------------------------------------
 
 class VitalsSafetyCheck {
-  /// Validates temperature, SpO2, heart rate against safe OTC thresholds.
+  /// Grades vitals with the same rules as [VitalsReading.alerts] (thresholds
+  /// live in VitalThresholds), so the alert shown and the escalation decision
+  /// always agree. Any emergency-level vital blocks every medication.
   static SafetyCheckResult run(VitalsReading vitals) {
-    final alerts = <SafetyAlert>[];
-    var escalate = false;
-    String? reason;
-
-    // ── Temperature ──
-    if (vitals.temperatureCelsius > 38.0) {
-      escalate = true;
-      reason = 'HYPERPYREXIA: Temperature ${vitals.temperatureCelsius.toStringAsFixed(1)}°C is dangerously high.';
-      alerts.add(SafetyAlert(
-        level: AlertLevel.emergency,
-        message:
-            '🚨 $reason OTC paracetamol is insufficient. Seek emergency care IMMEDIATELY.',
-        requiresEscalation: true,
-      ));
-    } else if (vitals.temperatureCelsius < 33.0) {
-      escalate = true;
-      reason = 'HYPOTHERMIA: Temperature ${vitals.temperatureCelsius.toStringAsFixed(1)}°C is critically low.';
-      alerts.add(SafetyAlert(
-        level: AlertLevel.emergency,
-        message:
-            '🚨 $reason Seek emergency care IMMEDIATELY.',
-        requiresEscalation: true,
-      ));
-    } else if (vitals.temperatureCelsius >= 37.5) {
-      alerts.add(SafetyAlert(
-        level: AlertLevel.warning,
-        message:
-            '⚠️ Very high fever (${vitals.temperatureCelsius.toStringAsFixed(1)}°C). '
-            'OTC management is a temporary measure only. Medical evaluation strongly advised within 24 hours.',
-      ));
-    }
-
-    // ── SpO2 ──
-    if (vitals.spo2Percent < 90.0) {
-      escalate = true;
-      reason = 'CRITICAL SpO₂: ${vitals.spo2Percent.toStringAsFixed(0)}% (dangerously low oxygen).';
-      alerts.add(SafetyAlert(
-        level: AlertLevel.emergency,
-        message:
-            '🆘 $reason Call emergency services NOW.',
-        requiresEscalation: true,
-      ));
-    } else if (vitals.spo2Percent < 95.0) {
-      alerts.add(SafetyAlert(
-        level: AlertLevel.warning,
-        message:
-            '⚠️ Low SpO₂ ${vitals.spo2Percent.toStringAsFixed(0)}%. '
-            'Below normal range. Seek medical evaluation before relying on OTC drugs.',
-      ));
-    }
-
-    // ── Heart Rate ──
-    if (vitals.heartRateBpm > 130) {
-      escalate = true;
-      reason = 'SEVERE TACHYCARDIA: Heart rate ${vitals.heartRateBpm} bpm.';
-      alerts.add(SafetyAlert(
-        level: AlertLevel.emergency,
-        message:
-            '🚨 $reason Seek emergency care immediately.',
-        requiresEscalation: true,
-      ));
-    } else if (vitals.heartRateBpm > 100) {
-      alerts.add(SafetyAlert(
-        level: AlertLevel.warning,
-        message:
-            '⚠️ Elevated heart rate ${vitals.heartRateBpm} bpm. '
-            'Monitor closely. If persistent, seek medical evaluation.',
-      ));
-    } else if (vitals.heartRateBpm < 50) {
-      alerts.add(SafetyAlert(
-        level: AlertLevel.warning,
-        message:
-            '⚠️ Low heart rate ${vitals.heartRateBpm} bpm (bradycardia). '
-            'Seek medical evaluation.',
-      ));
-    }
+    final vitalsAlerts = vitals.alerts;
+    final emergencies =
+        vitalsAlerts.where((a) => a.level == AlertLevel.emergency).toList();
+    final escalate = emergencies.isNotEmpty;
 
     return SafetyCheckResult(
       passed: !escalate,
-      alerts: alerts,
+      alerts: [
+        for (final a in vitalsAlerts)
+          SafetyAlert(
+            level: a.level,
+            message: a.message,
+            requiresEscalation: a.level == AlertLevel.emergency,
+          ),
+      ],
       blockedMedications: escalate ? Medication.values.toSet() : {},
       escalationRequired: escalate,
-      escalationReason: reason,
+      escalationReason: escalate ? emergencies.first.message : null,
     );
   }
 }
@@ -216,7 +161,7 @@ class RedFlagSymptomCheck {
     // Check anaphylaxis pattern
     if (RedFlagConstants.isAnaphylaxis(symptoms)) {
       escalate = true;
-      reason ??= 'Possible Anaphylaxis: Facial/lip/tongue swelling with breathing difficulty.';
+      reason ??= 'Possible anaphylaxis (face, lip or tongue swelling with breathing difficulty). Call 112 immediately.';
       alerts.add(SafetyAlert(
         level: AlertLevel.emergency,
         message:
@@ -229,7 +174,7 @@ class RedFlagSymptomCheck {
     // Breathing difficulty without anaphylaxis — still dangerous
     if (symptoms.contains(StandardSymptom.breathing_difficulty) && !escalate) {
       escalate = true;
-      reason = 'Breathing difficulty detected.';
+      reason = 'Breathing difficulty cannot be treated with OTC medicine. Seek emergency care immediately.';
       alerts.add(SafetyAlert(
         level: AlertLevel.emergency,
         message:
@@ -242,11 +187,12 @@ class RedFlagSymptomCheck {
     // Severe abdominal pain check
     if (symptoms.contains(StandardSymptom.severe_abdominal_pain)) {
       escalate = true;
-      reason ??= 'Severe abdominal pain (possible serious internal cause).';
-      alerts.add(SafetyAlert(
+      const abdominalReason =
+          'Severe abdominal pain can have a serious internal cause. Seek emergency evaluation immediately.';
+      reason ??= abdominalReason;
+      alerts.add(const SafetyAlert(
         level: AlertLevel.emergency,
-        message:
-            '🚨 $reason Seek emergency evaluation immediately.',
+        message: '🚨 $abdominalReason',
         requiresEscalation: true,
       ));
     }
@@ -267,9 +213,27 @@ class RedFlagSymptomCheck {
 // ---------------------------------------------------------------------------
 
 class ContraindicationCheck {
+  /// Every dose in [MedicationInfo.standardAdultDosing] is an adult dose.
+  static const int minAdultDosingAge = 12;
+
   static SafetyCheckResult run(PatientInput input) {
     final alerts = <SafetyAlert>[];
     final blocked = <Medication>{};
+    String? escalationReason;
+
+    // ── Age ──
+    final age = input.patientAgeYears;
+    if (age != null && age < minAdultDosingAge) {
+      escalationReason =
+          'Baymax only gives adult doses. For anyone under $minAdultDosingAge, ask a doctor or pharmacist '
+          'for the right medicine and dose.';
+      blocked.addAll(Medication.values);
+      alerts.add(SafetyAlert(
+        level: AlertLevel.danger,
+        message: '⛔ $escalationReason',
+        requiresEscalation: true,
+      ));
+    }
 
     // ── PARACETAMOL contraindications ──
     if (input.knownConditions.contains(KnownCondition.chronic_liver_disease)) {
@@ -306,6 +270,7 @@ class ContraindicationCheck {
     final ibuprofenContraindications = [
       (KnownCondition.gastric_ulcer, 'Gastric ulcer history'),
       (KnownCondition.kidney_disease, 'Kidney disease'),
+      (KnownCondition.severe_kidney_impairment, 'Severe kidney impairment'),
       (KnownCondition.nsaid_asthma, 'NSAID-exacerbated asthma'),
       (KnownCondition.heart_disease, 'Heart disease'),
     ];
@@ -330,6 +295,44 @@ class ContraindicationCheck {
       ));
     }
 
+    // Over 65: NSAIDs are riskier but still an option (spec: caution, info).
+    if (age != null && age > 65 && !blocked.contains(Medication.ibuprofen)) {
+      alerts.add(const SafetyAlert(
+        level: AlertLevel.info,
+        message: 'ℹ️ IBUPROFEN CAUTION: Over 65, NSAIDs raise the risk of stomach bleeding and kidney problems. '
+            'Take ibuprofen with food and for the shortest time possible.',
+      ));
+    }
+
+    // ── CETIRIZINE / FAMOTIDINE allergies ──
+    // An antihistamine allergy can be stored as an allergy or (older profiles)
+    // as a condition; both must block cetirizine.
+    if (input.knownAllergies.contains(DrugAllergy.antihistamine) ||
+        input.knownConditions.contains(KnownCondition.antihistamine_allergy)) {
+      blocked.add(Medication.cetirizine);
+      alerts.add(const SafetyAlert(
+        level: AlertLevel.danger,
+        message: '⛔ CETIRIZINE BLOCKED: Known antihistamine allergy on record.',
+        blockedMedication: 'Cetirizine',
+      ));
+    }
+    if (input.knownConditions.contains(KnownCondition.severe_kidney_impairment)) {
+      blocked.add(Medication.cetirizine);
+      alerts.add(const SafetyAlert(
+        level: AlertLevel.danger,
+        message: '⛔ CETIRIZINE BLOCKED: Severe kidney impairment. The dose has to be adjusted by a doctor.',
+        blockedMedication: 'Cetirizine',
+      ));
+    }
+    if (input.knownAllergies.contains(DrugAllergy.famotidine)) {
+      blocked.add(Medication.famotidine);
+      alerts.add(const SafetyAlert(
+        level: AlertLevel.danger,
+        message: '⛔ FAMOTIDINE BLOCKED: Known famotidine allergy on record.',
+        blockedMedication: 'Famotidine',
+      ));
+    }
+
     // Ibuprofen symptom-based contraindications (from symptom list)
     if (input.allSymptoms.contains(StandardSymptom.reduced_urination) ||
         input.allSymptoms.contains(StandardSymptom.no_urine)) {
@@ -351,6 +354,7 @@ class ContraindicationCheck {
       alerts: alerts,
       blockedMedications: blocked,
       escalationRequired: escalationRequired,
+      escalationReason: escalationReason,
     );
   }
 }
@@ -387,7 +391,8 @@ class ComplexityCheck {
         ],
         blockedMedications: Medication.values.toSet(),
         escalationRequired: true,
-        escalationReason: 'Multi-system symptom complexity (${systems.length} systems involved).',
+        escalationReason:
+            'Your symptoms involve ${systems.length} body systems, which is beyond what OTC medicine should handle. Please see a doctor.',
       );
     }
 

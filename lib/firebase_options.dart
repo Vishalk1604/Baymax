@@ -17,7 +17,10 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'DefaultFirebaseOptions have not been configured for web - '
+        'you can reconfigure this by running the FlutterFire CLI again.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -33,7 +36,10 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -46,31 +52,11 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBS5SBp3ne6g5rxi87F8kTi-TknPF-Wkac',
-    appId: '1:384152045500:web:d8838a6ceec5a5d3e4cdb9',
-    messagingSenderId: '384152045500',
-    projectId: 'baymax-2591a',
-    authDomain: 'baymax-2591a.firebaseapp.com',
-    storageBucket: 'baymax-2591a.firebasestorage.app',
-    measurementId: 'G-LEMR6DMRLF',
-  );
-
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBLytiEN0vUGmqonzX9juzsWZV6a5WWjEE',
-    appId: '1:384152045500:android:ef991bec4db76feee4cdb9',
-    messagingSenderId: '384152045500',
-    projectId: 'baymax-2591a',
-    storageBucket: 'baymax-2591a.firebasestorage.app',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBS5SBp3ne6g5rxi87F8kTi-TknPF-Wkac',
-    appId: '1:384152045500:web:d87582d739b90d4ae4cdb9',
-    messagingSenderId: '384152045500',
-    projectId: 'baymax-2591a',
-    authDomain: 'baymax-2591a.firebaseapp.com',
-    storageBucket: 'baymax-2591a.firebasestorage.app',
-    measurementId: 'G-TTMH159VJH',
+    apiKey: 'AIzaSyDAziPnaLKUvO9OLwE3BiuiuCdP2NBC2ec',
+    appId: '1:642396231667:android:756f77260dbbbca52ae486',
+    messagingSenderId: '642396231667',
+    projectId: 'baymax-1c21f',
+    storageBucket: 'baymax-1c21f.firebasestorage.app',
   );
 }
